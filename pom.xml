@@ -5,14 +5,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.Vanilla_xi</groupId>
-    <artifactId>VideoStreamingSystem</artifactId>
+    <artifactId>video-streaming-system</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
-        <module>VideoCommon</module>
-        <module>VideoPojo</module>
-        <module>VideoServe</module>
-        <module>Pojo</module>
+        <module>video-common</module>
+        <module>video-pojo</module>
+        <module>video-serve</module>
     </modules>
 
     <properties>

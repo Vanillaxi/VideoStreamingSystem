@@ -1,0 +1,3 @@
+jwt.secret=密钥
+jwt.ttl= 有效时长
+jwt.tokenName= 你的名字

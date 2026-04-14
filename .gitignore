@@ -14,7 +14,7 @@ build/
 *.iws
 *.ipr
 
-#敏感配置文件 (保护你的数据库、JWT、Redis 密码)
+#敏感配置文件 (保护数据库、JWT、Redis 密码)
 # 忽略所有 resources 目录下的 properties 和 yml
 src/main/resources/*.properties
 src/main/resources/*.yml
