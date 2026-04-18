@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.CommentMapper">
+
+    <!--新增评论-->
+    <insert id="insert">
+        INSERT INTO comments (video_id, user_id, content, create_time)
+        VALUES (?, ?, ?, ?)
+    </insert>
+
+    <!--根据id查询评论-->
+    <select id="findByCommentId" resultType="com.video.pojo.entity.Comment">
+        SELECT
+        c.id,
+        c.video_id AS videoId,
+        c.user_id AS userId,
+        c.content,
+        c.create_time AS createTime,
+        u.username AS username
+        FROM comments c
+        LEFT JOIN user u ON c.user_id = u.id
+        WHERE c.id = ?
+        ORDER BY c.create_time DESC
+    </select>
+
+    <!--删除评论-->
+    <delete id="delete">
+        DELETE FROM comments WHERE id = ?
+    </delete>
+
+    <!--更改点赞-->
+    <update id="updateLikesCount">
+        UPDATE comments
+        SET likes_count = likes_count + ?
+        WHERE id = ?
+    </update>
+
+
+    <!--根据videoId分页查询-->
+    <select id="countByVideoId" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM comments
+        WHERE video_id = ?
+    </select>
+
+    <select id="findPageByVideoId" resultType="com.video.pojo.entity.Comment">
+        SELECT
+        c.id,
+        c.video_id AS videoId,
+        c.user_id AS userId,
+        c.content,
+        c.create_time AS createTime,
+        c.likes_count AS likesCount,
+        u.nickname AS nickname
+        FROM comments c
+        LEFT JOIN user u ON c.user_id = u.id
+        WHERE c.video_id = ?
+        ORDER BY c.create_time DESC
+        LIMIT ?, ?
+    </select>
+
+</mapper>

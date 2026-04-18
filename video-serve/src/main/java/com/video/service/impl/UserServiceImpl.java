@@ -2,13 +2,19 @@ package com.video.service.impl;
 
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
-import com.video.basedao.UserDao;
-import com.video.entity.User;
+import com.video.annotation.RequireRole;
+import com.video.exception.AccountExitException;
+import com.video.exception.AccountNotFoundException;
+import com.video.exception.NotLoginException;
+import com.video.exception.PasswordErrorException;
+import com.video.pojo.entity.User;
+import com.video.mapper.UserMapper;
 import com.video.service.UserService;
 import com.video.utils.JWTUtil;
 import com.video.utils.PasswordUtil;
 import com.video.utils.RedisUtil;
 import com.alibaba.fastjson.JSON;
+import com.video.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -16,43 +22,129 @@ import lombok.extern.slf4j.Slf4j;
 public class UserServiceImpl implements UserService {
 
     @MyAutowired
-    private UserDao userDao;
+    private UserMapper userMapper;
 
+    //注册
     @Override
-    public boolean register(User user) {
-        if (userDao.getByUsername(user.getUsername()) != null) {
-            throw new RuntimeException("该用户名已被注册");
+    public void register(User user) {
+        if (userMapper.getByUsername(user.getUsername()) != null) {
+            throw new AccountExitException();
         }
         String securePwd = PasswordUtil.hashPassword(user.getPassword());
         user.setPassword(securePwd);
-        return userDao.save(user) > 0;
+        user.setRole(0);
+        user.setCreatUser(user.getUsername());
+        user.setUpdateUser(user.getUsername());
+        userMapper.insert(user);
     }
 
+    //登录
     @Override
     public String login(String username, String password) {
-        // 1. 获取用户信息
-        User user = userDao.getByUsername(username);
+        User user = userMapper.getByUsername(username);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new AccountNotFoundException();
         }
 
-        // 2. 校验密码
         if (!PasswordUtil.checkPassword(password, user.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new PasswordErrorException();
         }
 
-        // 3. 登录成功，生成 Token
+        //  登录成功，生成 Token
         log.info("用户 {} 登录成功，准备下发令牌", username);
         String token = JWTUtil.generate(user.getId(), user.getUsername(), user.getRole());
 
-        // 4. 存入 Redis（必须加上和 Filter 一致的前缀）
+        // 存入 Redis
         String userJson = JSON.toJSONString(user);
         String redisKey = "login:token:" + token;
-
         RedisUtil.set(redisKey, userJson, 1800);
-
-        log.info("Token 已存入 Redis 1号库，Key 为: {}，过期时间 30min", redisKey);
 
         return token;
     }
+
+    //登出
+    @Override
+    public void logout(String token) {
+        if (token == null || token.isEmpty()) {
+            throw new NotLoginException();
+        }
+
+        // 删除 Redis 中的 token 记录
+        RedisUtil.del("login:token:" + token);
+        UserHolder.removeUser();
+        log.info("用户已登出，Token 已失效: {}", token);
+    }
+
+    /**
+     * 修改信息
+     * @param user
+     * @return
+     */
+    @Override
+    public void updateUserInfo(User user) {
+        User userDto=UserHolder.getUser();
+        if (user.getNickname()!=null) {userDto.setNickname(user.getNickname());}
+        if (user.getPassword()!=null) {userDto.setPassword(PasswordUtil.hashPassword(user.getPassword()));}
+        userMapper.update(userDto);
+    }
+
+    /**
+     * 注销自己
+     */
+    @Override
+    public void deleteMe() {
+        Long userId=UserHolder.getUser().getId();
+        userMapper.delete(userId);
+        String key = "user:cache:" + userId;
+        RedisUtil.del(key);
+        log.info("用户 {} 账号注销成功，已清理缓存", userId);
+    }
+
+    /**
+     * 封号,2级以上才可执行
+     * @param userId
+     */
+    @Override
+    public void removeUser(Long userId) {
+        if(userMapper.getByUserId(userId) == null) {
+            throw new AccountNotFoundException();
+        }
+        userMapper.delete(userId);
+        String key = "user:cache:" + userId;
+        RedisUtil.del(key);
+        log.info("用户 {} 账号注销成功，已清理缓存", userId);
+    }
+
+    /**
+     * 提权，2级以上才可执行
+     * @param userId
+     * @param role
+     * @return
+     */
+    @Override
+    public void promoteUser(Long userId, Integer role) {
+        User user=userMapper.getByUserId(userId);
+        if(user==null){
+            throw new AccountNotFoundException();
+        }
+        Long adminId=UserHolder.getUser().getId();
+        user.setUpdateUser(userMapper.getByUserId(adminId).getUsername());
+        user.setRole(role);
+        userMapper.update(user);
+    }
+
+    /**
+     * 查看用户信息
+     * @param id
+     * @return
+     */
+    @Override
+    public User getById(Long id) {
+        User user= userMapper.getByUserId(id);
+        if(user==null){
+            throw new AccountNotFoundException();
+        }
+        return user;
+    }
+
 }

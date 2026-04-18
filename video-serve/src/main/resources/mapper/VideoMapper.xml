@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.VideoMapper">
+
+    <!--根据id查询视频-->
+    <select id="getById" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        url,
+        user_id AS userId,
+        create_time AS createTime,
+        likes_count AS likesCount
+        FROM videos
+        WHERE id = ?
+    </select>
+
+    <insert id="postVideo" parameterType="com.video.pojo.entity.Video">
+        INSERT INTO videos (title,url, user_id,likes_count, create_time)
+        VALUES (?, ?, ?, ?,?)
+    </insert>
+    <insert id="insertLikes">
+        INSERT INTO video_like (video_id, user_id) VALUES (?, ?)
+    </insert>
+
+    <delete id="deleteLikes">
+        DELETE FROM video_like WHERE video_id = ? AND user_id = ?
+    </delete>
+
+    <update id="updateLikes">
+        UPDATE videos
+        SET likes_count=likes_count+?
+        WHERE id =?
+    </update>
+
+
+    <!--模糊查询-->
+    <select id="getVideoCountByTitle" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM videos
+        WHERE title LIKE ?
+    </select>
+
+    <select id="getVideoPageByTitle" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id, title, url,
+        create_time, likes_count, user_id
+        FROM videos
+        WHERE title LIKE ?
+        ORDER BY create_time DESC
+        LIMIT ?, ?
+    </select>
+
+</mapper>

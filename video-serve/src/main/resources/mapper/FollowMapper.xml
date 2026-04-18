@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.FollowMapper">
+
+    <!--查询我的粉丝-->
+    <select id="findFollowers" resultType="com.video.pojo.entity.User">
+        SELECT
+        u.id,
+        u.username,
+        u.nickname,
+        f.create_time AS followTime
+        FROM user_follow f
+        LEFT JOIN user u ON f.follower_id = u.id
+        WHERE f.following_id = ?
+        ORDER BY f.create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <!--查询我的关注-->
+    <select id="findFollowings" resultType="com.video.pojo.entity.User">
+        SELECT
+        u.id,
+        u.username,
+        u.nickname,
+        f.create_time AS followTime
+        FROM user_follow f
+        LEFT JOIN user u ON f.following_id = u.id
+        WHERE f.follower_id = ?
+        ORDER BY f.create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <!--查询互关-->
+    <select id="findFriends" resultType="com.video.pojo.entity.User">
+        SELECT
+        u.id,
+        u.username,
+        u.nickname
+        FROM user_follow f1
+        INNER JOIN user_follow f2 ON f1.follower_id = f2.following_id
+        AND f1.following_id = f2.follower_id
+        LEFT JOIN user u ON f1.following_id = u.id
+        WHERE f1.follower_id = ?
+        ORDER BY f1.create_time DESC
+    </select>
+
+    <!--关注数-->
+    <select id="countFollowings" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM user_follow
+        WHERE follower_id = ?
+    </select>
+
+    <!--粉丝数-->
+    <select id="countFollowers" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM user_follow
+        WHERE following_id = ?
+    </select>
+
+    <!--互关数-->
+    <select id="countFriends" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM user_follow f1
+        INNER JOIN user_follow f2 ON f1.follower_id = f2.following_id
+        AND f1.following_id = f2.follower_id
+        WHERE f1.follower_id = ?
+    </select>
+
+    <!--查询是否关注-->
+    <select id="isFollow" resultType="java.lang.Boolean">
+        SELECT COUNT(*)
+        FROM user_follow
+        WHERE following_id = ? AND follower_id = ?
+    </select>
+
+    <!--添加关注-->
+    <insert id="follow">
+        INSERT INTO user_follow (following_id, follower_id, create_time)
+        VALUES (?, ?, NOW())
+    </insert>
+
+    <!--取消关注-->
+    <delete id="unFollow">
+        DELETE FROM user_follow
+        WHERE following_id = ? AND follower_id = ?
+    </delete>
+
+</mapper>

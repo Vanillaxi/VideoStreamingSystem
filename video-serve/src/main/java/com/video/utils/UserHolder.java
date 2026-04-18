@@ -1,6 +1,6 @@
 package com.video.utils;
 
-import com.video.entity.User;
+import com.video.pojo.entity.User;
 
 public class UserHolder {
     private static final ThreadLocal<User> tl = new ThreadLocal<>();

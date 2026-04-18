@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.UserMapper">
+
+    <!--根据名字查询用户-->
+    <select id="getByUsername" resultType="com.video.pojo.entity.User">
+        SELECT id, username, password, role,nickname FROM user WHERE username = ?
+    </select>
+
+    <!--根据id查询用户-->
+    <select id="getByUserId" resultType="com.video.pojo.entity.User">
+        SELECT id, username, password, role,nickname FROM user WHERE id = ?
+    </select>
+
+    <!--添加用户-->
+    <insert id="insert">
+        INSERT INTO user (username, password, role,nickname,create_user,update_user) VALUES (?, ?, ?,?,?,?)
+    </insert>
+
+    <!--修改用户信息-->
+    <update id="update">
+        UPDATE user
+        SET username=?,
+        password = ?,
+        nickname = ?,
+        role=?,
+        update_user=?
+        WHERE id = ?
+    </update>
+
+    <!--注销用户-->
+    <delete id="delete">
+        DELETE from user where id=?
+    </delete>
+
+</mapper>
