@@ -1,6 +1,7 @@
 package com.video.pojo.dto;
 
-import com.video.entity.User;
+
+import com.video.pojo.entity.User;
 import lombok.Data;
 import java.util.List;
 
