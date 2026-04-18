@@ -4,17 +4,13 @@ import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
 import com.video.exception.VideoNotFoundException;
 import com.video.pojo.dto.PageResult;
-import com.video.pojo.entity.User;
 import com.video.pojo.entity.Video;
 import com.video.mapper.VideoMapper;
-import com.video.pojo.dto.Result;
 import com.video.service.VideoService;
 import com.video.utils.CacheClient;
-import com.video.utils.JdbcUtils;
 import com.video.utils.RedisUtil;
 import com.video.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;

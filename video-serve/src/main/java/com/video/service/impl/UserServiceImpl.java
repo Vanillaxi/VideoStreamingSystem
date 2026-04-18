@@ -2,7 +2,6 @@ package com.video.service.impl;
 
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
-import com.video.annotation.RequireRole;
 import com.video.exception.AccountExitException;
 import com.video.exception.AccountNotFoundException;
 import com.video.exception.NotLoginException;

@@ -2,7 +2,6 @@ package com.video.mapper.impl;
 
 import com.video.annotation.MyComponent;
 import com.video.exception.VideoNotFoundException;
-import com.video.pojo.entity.User;
 import com.video.pojo.entity.Video;
 import com.video.mapper.VideoMapper;
 import com.video.utils.XmlSqlReaderUtil;

@@ -2,20 +2,11 @@ package com.video.controller;
 
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyMapping;
-import com.video.entity.Comment;
 import com.video.pojo.dto.PageResult;
-import com.video.proxy.BeanFactory;
 import com.video.service.CommentService;
 import com.video.pojo.dto.Result;
-import com.video.service.VideoService;
-import com.video.utils.JSONUtil;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.List;
+
 
 @WebServlet("/comment/*")
 public class CommentController extends BaseController {
