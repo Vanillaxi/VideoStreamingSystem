@@ -47,4 +47,22 @@ public class DBPool {
     public static synchronized void releaseConnection(Connection conn) {
         pool.addLast(conn);
     }
+
+    // 关闭连接池：关闭所有连接并清空池
+    public static synchronized void close() {
+        if (pool == null || pool.isEmpty())
+            return;
+        for (Connection conn : pool) {
+            try {
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
+            } catch (Exception e) {
+                log.error("关闭数据库连接失败", e);
+            }
+        }
+        int size = pool.size();
+        pool.clear();
+        log.info("MySQL 连接池已关闭，共释放 {} 个连接", size);
+    }
 }

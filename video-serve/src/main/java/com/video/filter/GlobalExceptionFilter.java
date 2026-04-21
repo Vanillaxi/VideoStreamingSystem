@@ -18,9 +18,9 @@ public class GlobalExceptionFilter implements Filter {
         try {
             chain.doFilter(request, response);
         } catch (Exception e) {
-            //Controlelr报错
+            //Controlelr报错（空指针，数据库断开）
             e.printStackTrace();
-            response.getWriter().write(JSONUtil.toJson(Result.error("系统繁忙，请稍后再试")));
+            response.getWriter().write(JSONUtil.toJson(Result.error("服务器内部错误，请联系香草管理员")));
         }
     }
 }

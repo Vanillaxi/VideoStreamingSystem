@@ -1,17 +1,13 @@
 package com.video.proxy;
 
-import com.video.annotation.RequireRole;
-import com.video.pojo.entity.User;
-import com.video.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
-
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
 @Slf4j
 public class ServiceProxy implements InvocationHandler {
-    private Object target;
+    private Object target; //被代理的真实对象
     public ServiceProxy(Object target) {
         this.target = target;
     }
@@ -19,7 +15,6 @@ public class ServiceProxy implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         try {
-
             log.info("【AOP 日志】开始执行方法: {}", method.getName());
             Object result = method.invoke(target, args);
             log.info("【AOP 日志】方法执行结束: {}", method.getName());
@@ -32,11 +27,11 @@ public class ServiceProxy implements InvocationHandler {
         }
     }
 
-    // 封装创建代理的逻辑
+    // 封装创建代理
     public static Object createProxy(Object target) {
         return Proxy.newProxyInstance(
-                target.getClass().getClassLoader(),
-                target.getClass().getInterfaces(),
+                target.getClass().getClassLoader(),//类加载器
+                target.getClass().getInterfaces(),//目标接口
                 new ServiceProxy(target)
         );
     }

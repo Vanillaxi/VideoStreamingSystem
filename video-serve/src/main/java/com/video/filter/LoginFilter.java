@@ -22,7 +22,7 @@ public class LoginFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
 
-        // 1. 获取 Token
+        // 获取 Token
         String token = req.getHeader("token");
 
         if (token != null && !token.isEmpty()) {
@@ -39,13 +39,13 @@ public class LoginFilter implements Filter {
             }
         }
 
-        // 5.  拿完整路径
+        // 拿完整路径
         String path = req.getRequestURI();
         log.info("Filter正在校验路径: {}", path);
 
         // 放行
         if (path.contains("/login") || path.contains("/register")) {
-            log.info("白名单匹配成功，放行: {}", path);
+            log.info("放行: {}", path);
             chain.doFilter(request, response);
             return;
         }

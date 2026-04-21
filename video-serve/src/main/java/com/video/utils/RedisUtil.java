@@ -152,4 +152,12 @@ public class RedisUtil {
         }
     }
 
+    // 关闭 Redis 连接池
+    public static void close() {
+        if (RedisConfiguration.getJedisPool() != null && !RedisConfiguration.getJedisPool().isClosed()) {
+            RedisConfiguration.getJedisPool().close();
+            log.info("Redis 连接池已关闭");
+        }
+    }
+
 }

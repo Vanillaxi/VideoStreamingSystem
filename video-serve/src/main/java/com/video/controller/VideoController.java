@@ -27,7 +27,7 @@ public class VideoController extends BaseController {
     }
 
     /**
-     * 根据title 模糊查询（分页）
+     * 根据title 模糊查询
      * @param title
      * @return
      */

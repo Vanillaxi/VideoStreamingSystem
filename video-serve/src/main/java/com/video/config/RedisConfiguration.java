@@ -22,7 +22,7 @@ public class RedisConfiguration {
                 config.setMaxTotal(Integer.parseInt(props.getProperty("redis.maxTotal", "20")));
                 config.setMaxIdle(Integer.parseInt(props.getProperty("redis.maxIdle", "10")));
 
-                // 2. 读取配置信息，这里保险起见，设置了默认值
+                // 2. 读取配置信息，设置了默认值
                 String host = props.getProperty("redis.host", "localhost");
                 int port = Integer.parseInt(props.getProperty("redis.port", "6379"));
                 String password = props.getProperty("redis.password");

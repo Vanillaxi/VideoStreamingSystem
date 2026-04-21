@@ -3,6 +3,7 @@ package com.video.proxy;
 import lombok.extern.slf4j.Slf4j;
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
+
 import java.io.File;
 import java.lang.reflect.Field;
 import java.net.URL;
@@ -16,11 +17,10 @@ public class BeanFactory {
 
     static {
         try {
-            log.info("beanFactory 启动...");
-            scanPackages("com.video");
-            executeInjection();
-
-            wrapAOP();
+            log.info("beanFactory 启动");
+            scanPackages("com.video");//扫描
+            executeInjection();//注入
+            wrapAOP();//AOP
             log.info("初始化成功");
         } catch (Exception e) {
             log.error("初始化失败", e);
@@ -39,6 +39,7 @@ public class BeanFactory {
         }
     }
 
+    //包扫描(仿ComponentScan)
     private static void doScan(File dir, String packageName) throws Exception {
         if (!dir.exists() || !dir.isDirectory()) {
             return;
@@ -57,6 +58,7 @@ public class BeanFactory {
                     if (!beanMap.containsKey(beanName)) {
                         // 这里只创建原始实例
                         Object instance = clazz.getDeclaredConstructor().newInstance();
+                        //放入单例池
                         beanMap.put(beanName, instance);
                         log.info("【成功加载原始 Bean】: {} -> {}", beanName, className);
                     }
@@ -66,6 +68,7 @@ public class BeanFactory {
     }
 
 
+    //依赖注入：(反射+类型匹配)
     public static void executeInjection() {
         for (Object bean : beanMap.values()) {
             // 获取原始类（防止因为已经是代理对象而拿不到字段）
@@ -94,9 +97,11 @@ public class BeanFactory {
     }
 
     /**
-     * 专门为外部对象（如 Servlet）提供依赖注入
+     * 专门为外部对象（如 Controller）提供依赖注入
      * 即使该对象不在 beanMap 中，也能扫描其带有 @MyAutowired 的字段并赋值
      */
+    //因为 Controller 是 Tomcat 通过 @WebServlet 创建的，不归 BeanFactory 管理，
+    // 所以专门写了一个方法给"外部对象"做依赖注入。
     public static void injectExternalObject(Object obj) {
         if (obj == null) return;
 
@@ -129,9 +134,10 @@ public class BeanFactory {
 
     /**
      * 实现内部注入（如BeanMap里的Bean)
+     *
      * @param clazz
-     * @return
      * @param <T>
+     * @return
      */
     public static <T> T getBean(Class<T> clazz) {
         for (Object bean : beanMap.values()) {
@@ -142,17 +148,20 @@ public class BeanFactory {
         throw new RuntimeException("未找到类型为 " + clazz.getName() + " 的 Bean");
     }
 
+    /**
+     * AOP,JDK动态代理
+     */
     private static void wrapAOP() {
         Map<String, Object> proxies = new HashMap<>();
         for (Map.Entry<String, Object> entry : beanMap.entrySet()) {
             Object bean = entry.getValue();
             // 确保是实现类且不是代理对象本身
             if (bean.getClass().getName().contains(".service.impl")) {
-                Object proxyBean = com.video.proxy.ServiceProxy.createProxy(bean);
+                Object proxyBean = ServiceProxy.createProxy(bean);
                 proxies.put(entry.getKey(), proxyBean);
             }
         }
-        // 统一替换
+        // 用代理替换原对象
         beanMap.putAll(proxies);
         log.info("【AOP】所有 Service 已成功替换为代理对象");
     }
@@ -168,8 +177,18 @@ public class BeanFactory {
         return null;
     }
 
+    //触发类加载，从而执行static块
     public static void init() {
         // 静态块会在第一次访问该类时执行
         log.info("BeanFactory 初始化接口被调用...");
+    }
+
+    // 销毁容器：清空所有 Bean 引用，帮助 GC 回收
+    public static synchronized void destroy() {
+        if (beanMap != null && !beanMap.isEmpty()) {
+            int size = beanMap.size();
+            beanMap.clear();
+            log.info("BeanFactory 容器已销毁，共清理 {} 个 Bean", size);
+        }
     }
 }

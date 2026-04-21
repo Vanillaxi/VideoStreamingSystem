@@ -24,6 +24,10 @@ import com.video.utils.UserHolder;
 public abstract class BaseController extends HttpServlet {
     private final Map<String, Method> handlerMap = new HashMap<>();
 
+    /**
+     * 路由注册
+     * @throws ServletException
+     */
     @Override
     public void init() throws ServletException {
         BeanFactory.injectExternalObject(this);
@@ -38,6 +42,15 @@ public abstract class BaseController extends HttpServlet {
         }
     }
 
+    /**
+     * 请求分发
+     * @param req the {@link HttpServletRequest} object that contains the request the client made of the servlet
+     *
+     * @param resp the {@link HttpServletResponse} object that contains the response the servlet returns to the client
+     *
+     * @throws ServletException
+     * @throws IOException
+     */
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 
@@ -52,6 +65,7 @@ public abstract class BaseController extends HttpServlet {
         }
 
         try {
+            //参数绑定
             Class<?>[] parameterTypes = handler.getParameterTypes();
             Object[] args = new Object[parameterTypes.length];
             String bodyJson = null;
@@ -85,7 +99,7 @@ public abstract class BaseController extends HttpServlet {
                 log.info("参数索引: {}, 尝试获取的参数名: {}, 实际获取的值: {}", i, parameter.getName(), args[i]);
             }
 
-            // --- 鉴权判定开始 ---
+            // 鉴权
             RequireRole requireRole = handler.getAnnotation(RequireRole.class);
 
             if (requireRole == null) {
@@ -99,20 +113,19 @@ public abstract class BaseController extends HttpServlet {
                 int requiredLevel = requireRole.value();
                 User user = UserHolder.getUser();
 
-                // 校验逻辑
+                // 校验
                 if (user == null || user.getRole() < requiredLevel) {
                     log.warn("权限不足拦截: 用户等级 {}, 接口要求等级 {}, 路径 {}",
                             user == null ? "未登录" : user.getRole(), requiredLevel, path);
                     resp.getWriter().write(JSONUtil.toJson(Result.error("权限不足，请联系香草管理员")));
-                    return; // 拦截
+                    return;
                 }
             }
 
-            // 2. 反射调用
+            //  反射调用
             handler.setAccessible(true);
             Object result = handler.invoke(this, args);
 
-            // 3. 统一处理成功响应
             Result finalResult;
 
             if (result instanceof Result) {
@@ -129,7 +142,7 @@ public abstract class BaseController extends HttpServlet {
             resp.getWriter().write(JSONUtil.toJson(finalResult));
 
         } catch (Exception e) {
-            // 4. 统一处理异常
+            // 统一处理异常
             Throwable cause = e.getCause(); // 获取 invoke 抛出的真实异常
 
             if (cause instanceof BaseException) {
