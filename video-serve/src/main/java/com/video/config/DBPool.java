@@ -32,6 +32,11 @@ public class DBPool {
             initialized = true;
             log.info("MySQL 数据库连接池初始化成功，当前容量：{}", pool.size());
         } catch (Exception e) {
+            for (Connection conn : pool) {
+                closeSilently(conn);
+            }
+            pool.clear();
+            initialized = false;
             log.error("数据库连接池初始化失败", e);
         }
     }

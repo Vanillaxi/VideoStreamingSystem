@@ -3,7 +3,8 @@ package com.video.service.impl;
 
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
-import com.video.exception.NotAllowFollowException;
+import com.video.exception.BusinessException;
+import com.video.exception.ErrorCode;
 import com.video.mapper.FollowMapper;
 import com.video.mapper.UserMapper;
 import com.video.pojo.dto.PageResult;
@@ -92,7 +93,7 @@ public class FollowServiceImpl implements FollowService {
     public void changeFollow(Long targetUserId) {
         Long myId = UserHolder.getUser().getId();
         if(myId.equals(targetUserId)){
-            throw new NotAllowFollowException();
+            throw new BusinessException(ErrorCode.NOT_ALLOW_FOLLOW);
         }
         int delta = followMapper.changeFollowWithTransaction(targetUserId, myId);
         if (delta != 0) {

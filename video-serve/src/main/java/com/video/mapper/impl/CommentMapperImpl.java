@@ -2,8 +2,9 @@ package com.video.mapper.impl;
 
 import com.video.annotation.MyComponent;
 import com.video.config.DBPool;
-import com.video.exception.BaseException;
-import com.video.exception.CommentNotFoundException;
+import com.video.exception.BusinessException;
+import com.video.exception.ErrorCode;
+import com.video.exception.SystemException;
 import com.video.pojo.entity.Comment;
 import com.video.mapper.CommentMapper;
 
@@ -17,7 +18,6 @@ import java.util.Collections;
 import java.util.List;
 import com.video.utils.XmlSqlReaderUtil;
 import static com.video.utils.JdbcUtils.*;
-import static com.video.constant.MessageConstant.PARENT_COMMENT_NOT_FOUND;
 
 @MyComponent
 public class CommentMapperImpl implements CommentMapper {
@@ -37,10 +37,10 @@ public class CommentMapperImpl implements CommentMapper {
             if (comment.getParentId() != null) {
                 Comment parent = findParentForUpdate(conn, findParentSql, comment.getParentId());
                 if (parent == null) {
-                    throw new BaseException(PARENT_COMMENT_NOT_FOUND);
+                    throw new BusinessException(ErrorCode.PARENT_COMMENT_NOT_FOUND);
                 }
                 if (!parent.getVideoId().equals(comment.getVideoId())) {
-                    throw new BaseException(PARENT_COMMENT_NOT_FOUND);
+                    throw new BusinessException(ErrorCode.PARENT_COMMENT_NOT_FOUND);
                 }
                 comment.setRootId(parent.getRootId() == null ? parent.getId() : parent.getRootId());
                 comment.setReplyToUserId(parent.getUserId());
@@ -74,7 +74,7 @@ public class CommentMapperImpl implements CommentMapper {
             throw e;
         } catch (Exception e) {
             rollback(conn);
-            throw new RuntimeException("新增评论失败", e);
+            throw new SystemException(ErrorCode.SYSTEM_ERROR, e);
         } finally {
             resetAutoCommit(conn);
             DBPool.releaseConnection(conn);
@@ -87,7 +87,7 @@ public class CommentMapperImpl implements CommentMapper {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.CommentMapper.findByCommentId");
         List<Comment> commentList = executeQuery(Comment.class, sql, commentId);
         if (commentList == null || commentList.size() == 0) {
-            throw new CommentNotFoundException();
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
         }
         return commentList.get(0);
     }

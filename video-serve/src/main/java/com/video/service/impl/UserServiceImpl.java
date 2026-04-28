@@ -2,10 +2,9 @@ package com.video.service.impl;
 
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
-import com.video.exception.AccountExitException;
-import com.video.exception.AccountNotFoundException;
-import com.video.exception.NotLoginException;
-import com.video.exception.PasswordErrorException;
+import com.video.exception.AuthException;
+import com.video.exception.BusinessException;
+import com.video.exception.ErrorCode;
 import com.video.pojo.entity.User;
 import com.video.mapper.UserMapper;
 import com.video.service.UserService;
@@ -31,7 +30,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public void register(User user) {
         if (userMapper.getByUsername(user.getUsername()) != null) {
-            throw new AccountExitException();
+            throw new BusinessException(ErrorCode.ACCOUNT_ALREADY_EXIST);
         }
         String securePwd = PasswordUtil.hashPassword(user.getPassword());
         user.setPassword(securePwd);
@@ -46,11 +45,11 @@ public class UserServiceImpl implements UserService {
     public String login(String username, String password) {
         User user = userMapper.getByUsername(username);
         if (user == null) {
-            throw new AccountNotFoundException();
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
 
         if (!PasswordUtil.checkPassword(password, user.getPassword())) {
-            throw new PasswordErrorException();
+            throw new AuthException(ErrorCode.PASSWORD_ERROR);
         }
 
         //  登录成功，生成 Token
@@ -70,7 +69,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public void logout(String token) {
         if (token == null || token.isEmpty()) {
-            throw new NotLoginException();
+            throw new AuthException(ErrorCode.USER_NOT_LOGIN);
         }
 
         // 删除 Redis 中的 token 记录
@@ -89,7 +88,7 @@ public class UserServiceImpl implements UserService {
         User currentUser = UserHolder.getUser();
         User userDto = userMapper.getByUserId(currentUser.getId());
         if (userDto == null) {
-            throw new AccountNotFoundException();
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
         
         if (user.getNickname()!=null) {userDto.setNickname(user.getNickname());}
@@ -108,7 +107,7 @@ public class UserServiceImpl implements UserService {
         User currentUser = UserHolder.getUser();
         User user = userMapper.getByUserId(currentUser.getId());
         if (user == null) {
-            throw new AccountNotFoundException();
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
 
         String oldObjectKey = user.getAvatarObjectKey();
@@ -147,7 +146,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public void removeUser(Long userId) {
         if(userMapper.getByUserId(userId) == null) {
-            throw new AccountNotFoundException();
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
         userMapper.delete(userId);
         String key = "user:cache:" + userId;
@@ -165,7 +164,7 @@ public class UserServiceImpl implements UserService {
     public void promoteUser(Long userId, Integer role) {
         User user=userMapper.getByUserId(userId);
         if(user==null){
-            throw new AccountNotFoundException();
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
         Long adminId=UserHolder.getUser().getId();
         user.setUpdateUser(userMapper.getByUserId(adminId).getUsername());
@@ -182,7 +181,7 @@ public class UserServiceImpl implements UserService {
     public User getById(Long id) {
         User user= userMapper.getByUserId(id);
         if(user==null){
-            throw new AccountNotFoundException();
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
         user.setPassword(null);
         return user;

@@ -240,15 +240,15 @@ public class OssClientUtil {
     private static String runCurl(String... args) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
         processBuilder.command(buildCurlCommand(args));
+        processBuilder.redirectErrorStream(true);
         Process process = processBuilder.start();
         try {
-            String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             int exitCode = process.waitFor();
             if (exitCode != 0) {
-                throw new IOException("curl 执行失败，exitCode=" + exitCode + "，" + stderr);
+                throw new IOException("curl 执行失败，exitCode=" + exitCode + "，" + output);
             }
-            return stdout.trim();
+            return output.trim();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("curl 执行被中断", e);

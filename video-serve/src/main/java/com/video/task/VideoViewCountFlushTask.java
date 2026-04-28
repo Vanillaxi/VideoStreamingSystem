@@ -52,6 +52,8 @@ public class VideoViewCountFlushTask {
             } catch (InterruptedException e) {
                 executorService.shutdownNow();
                 Thread.currentThread().interrupt();
+            } finally {
+                executorService = null;
             }
         }
         log.info("视频播放量刷库定时任务已关闭");

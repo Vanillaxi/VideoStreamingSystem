@@ -2,9 +2,9 @@ package com.video.service.impl;
 
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
-import com.video.exception.BaseException;
-import com.video.exception.DelectionNotAllowException;
-import com.video.exception.VideoNotFoundException;
+import com.video.exception.BusinessException;
+import com.video.exception.ErrorCode;
+import com.video.exception.SystemException;
 import com.video.pojo.dto.PageResult;
 import com.video.pojo.entity.Video;
 import com.video.pojo.entity.User;
@@ -56,7 +56,7 @@ public class VideoServiceImpl implements VideoService {
         Video video = queryVideoDetailWithCache(id);
 
         if(video==null){
-            throw new VideoNotFoundException();
+            throw new BusinessException(ErrorCode.VIDEO_NOT_FOUND);
         }
 
         return video;
@@ -90,14 +90,14 @@ public class VideoServiceImpl implements VideoService {
         Video video = videoMapper.getById(videoId);
         User currentUser = UserHolder.getUser();
         if (currentUser == null || (!video.getUserId().equals(currentUser.getId()) && currentUser.getRole() < 2)) {
-            throw new DelectionNotAllowException();
+            throw new BusinessException(ErrorCode.NOT_ALLOW_DELETE);
         }
 
         try {
             new OssClientUtil().deleteObject(video.getObjectKey());
         } catch (Exception e) {
             log.warn("OSS 文件删除失败，objectKey={}", video.getObjectKey(), e);
-            throw new BaseException("OSS 文件删除失败：" + e.getMessage());
+            throw new SystemException(ErrorCode.OSS_DELETE_FAILED, e);
         }
         videoMapper.deleteById(videoId);
         clearVideoCache(videoId, video.getCategoryId());

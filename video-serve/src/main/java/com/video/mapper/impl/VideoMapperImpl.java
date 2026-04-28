@@ -2,8 +2,9 @@ package com.video.mapper.impl;
 
 import com.video.annotation.MyComponent;
 import com.video.config.DBPool;
-import com.video.exception.BaseException;
-import com.video.exception.VideoNotFoundException;
+import com.video.exception.BusinessException;
+import com.video.exception.ErrorCode;
+import com.video.exception.SystemException;
 import com.video.pojo.entity.Video;
 import com.video.mapper.VideoMapper;
 import com.video.utils.XmlSqlReaderUtil;
@@ -31,7 +32,7 @@ public class VideoMapperImpl implements VideoMapper {
         List<Video> list = JdbcUtils.executeQuery(Video.class, sql, id);
 
         if (list == null || list.isEmpty()) {
-            throw new VideoNotFoundException();
+            throw new BusinessException(ErrorCode.VIDEO_NOT_FOUND);
         }
 
         return list.get(0);
@@ -137,7 +138,7 @@ public class VideoMapperImpl implements VideoMapper {
             return delta;
         } catch (Exception e) {
             rollback(conn);
-            throw new BaseException("点赞操作失败");
+            throw new SystemException(ErrorCode.LIKE_OPERATION_FAILED, e);
         } finally {
             resetAutoCommit(conn);
             DBPool.releaseConnection(conn);
@@ -172,7 +173,7 @@ public class VideoMapperImpl implements VideoMapper {
             return rows;
         } catch (Exception e) {
             rollback(conn);
-            throw new BaseException("播放量刷库失败");
+            throw new SystemException(ErrorCode.VIEW_COUNT_FLUSH_FAILED, e);
         } finally {
             resetAutoCommit(conn);
             DBPool.releaseConnection(conn);

@@ -16,7 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import com.video.annotation.RequireRole;
 import com.video.pojo.entity.User;
@@ -66,6 +68,7 @@ public abstract class BaseController extends HttpServlet {
             return;
         }
 
+        List<Part> partsToDelete = new ArrayList<>();
         try {
             //参数绑定
             Class<?>[] parameterTypes = handler.getParameterTypes();
@@ -90,7 +93,11 @@ public abstract class BaseController extends HttpServlet {
                     args[i] = resp;
                 } else if (type == Part.class) {
                     String paramName = handler.getParameters()[i].getName();
-                    args[i] = req.getPart(paramName);
+                    Part part = req.getPart(paramName);
+                    args[i] = part;
+                    if (part != null) {
+                        partsToDelete.add(part);
+                    }
                 } else if (isBasicType(type)) {
                     String paramName = handler.getParameters()[i].getName();
                     args[i] = convertBasicType(req.getParameter(paramName), type);
@@ -162,8 +169,20 @@ public abstract class BaseController extends HttpServlet {
                 log.error("系统崩溃 [{}]: ", path, cause);
                 resp.getWriter().write(JSONUtil.toJson(Result.error("系统繁忙，请稍后再试")));
             }
+        } finally {
+            deleteParts(partsToDelete);
         }
 
+    }
+
+    private void deleteParts(List<Part> parts) {
+        for (Part part : parts) {
+            try {
+                part.delete();
+            } catch (Exception e) {
+                log.warn("清理 multipart 临时文件失败: {}", part.getName(), e);
+            }
+        }
     }
 
     // 辅助方法：判断是否为基本数据类型

@@ -1,7 +1,6 @@
 package com.video.mapper.impl;
 
 import com.video.annotation.MyComponent;
-import com.video.exception.AccountNotFoundException;
 import com.video.pojo.entity.User;
 import com.video.mapper.UserMapper;
 import com.video.utils.JdbcUtils;

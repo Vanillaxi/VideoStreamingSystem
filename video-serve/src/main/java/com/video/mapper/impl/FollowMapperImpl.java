@@ -3,7 +3,8 @@ package com.video.mapper.impl;
 
 import com.video.annotation.MyComponent;
 import com.video.config.DBPool;
-import com.video.exception.BaseException;
+import com.video.exception.ErrorCode;
+import com.video.exception.SystemException;
 import com.video.pojo.entity.User;
 import com.video.pojo.entity.UserFollow;
 import com.video.mapper.FollowMapper;
@@ -103,7 +104,7 @@ public class FollowMapperImpl implements FollowMapper {
             return delta;
         } catch (Exception e) {
             rollback(conn);
-            throw new BaseException("关注操作失败");
+            throw new SystemException(ErrorCode.FOLLOW_OPERATION_FAILED, e);
         } finally {
             resetAutoCommit(conn);
             DBPool.releaseConnection(conn);

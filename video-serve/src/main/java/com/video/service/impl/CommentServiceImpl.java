@@ -2,7 +2,8 @@ package com.video.service.impl;
 
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
-import com.video.exception.DelectionNotAllowException;
+import com.video.exception.BusinessException;
+import com.video.exception.ErrorCode;
 import com.video.pojo.dto.PageResult;
 import com.video.pojo.entity.Comment;
 import com.video.mapper.CommentMapper;
@@ -104,7 +105,7 @@ public class CommentServiceImpl implements CommentService {
         Comment comment = commentMapper.findByCommentId(commentId);
         Long commentCreaterId = comment.getUserId();
         if(!userId.equals(commentCreaterId)){
-            throw new DelectionNotAllowException();
+            throw new BusinessException(ErrorCode.NOT_ALLOW_DELETE);
         }
         commentMapper.delete(commentId);
         clearCommentListCache(comment.getVideoId());
