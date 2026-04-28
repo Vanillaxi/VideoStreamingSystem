@@ -7,10 +7,14 @@ import com.video.annotation.RequireRole;
 import com.video.pojo.entity.User;
 import com.video.pojo.dto.Result;
 import com.video.service.UserService;
+import com.video.utils.AuthHeaderUtil;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.Part;
 import java.io.IOException;
 
 @WebServlet("/user/*")
+@MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 6 * 1024 * 1024)
 public class UserController extends BaseController {
     @MyAutowired
     private UserService userService;
@@ -43,8 +47,8 @@ public class UserController extends BaseController {
      * @return
      */
     @MyMapping(value = "/logout", method = "POST")
-    public Result logout(@MyHeader("token") String token) {
-        userService.logout(token);
+    public Result logout(@MyHeader("Authorization") String authorization) {
+        userService.logout(AuthHeaderUtil.extractBearerToken(authorization));
         return Result.success("退出成功");
     }
 
@@ -57,6 +61,15 @@ public class UserController extends BaseController {
     public Result updateUserInfo(User user) {
         userService.updateUserInfo(user);
         return Result.success("个人资料修改成功");
+    }
+
+    /**
+     * 上传或修改头像
+     */
+    @MyMapping(value = "/avatar", method = "POST")
+    public Result updateAvatar(Part file) throws IOException {
+        userService.updateAvatar(file);
+        return Result.success("头像修改成功");
     }
 
     /**

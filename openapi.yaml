@@ -1,0 +1,1265 @@
+openapi: 3.0.3
+info:
+  title: VideoStreamingSystem API
+  version: 1.0.0
+  description: |
+    根据当前 Java Servlet Controller/@MyMapping 扫描生成。
+
+    认证说明：
+    - 使用 Authorization: Bearer {token}
+
+    根据当前已有 Servlet 接口生成：用户、视频、评论、关注、收藏、分类。
+servers:
+  - url: http://localhost:8080/video-serve
+    description: Local Tomcat
+tags:
+  - name: User
+    description: 用户模块
+  - name: Video
+    description: 视频模块
+  - name: Comment
+    description: 评论模块，支持两级展示的楼中楼评论
+  - name: Follow
+    description: 关注/粉丝/互粉模块
+  - name: Favorite
+    description: 视频收藏模块
+  - name: Category
+    description: 视频分区模块
+  - name: Admin
+    description: 管理接口
+
+paths:
+  /user/register:
+    post:
+      tags: [User]
+      summary: 用户注册
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegisterRequest'
+            example:
+              username: alice
+              password: "123456"
+              nickname: Alice
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+              example:
+                code: 1
+                msg: success
+                data: 注册成功
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/login:
+    post:
+      tags: [User]
+      summary: 用户登录
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: alice
+              password: "123456"
+      responses:
+        '200':
+          description: 登录成功，data 和响应头 Authorization 返回登录令牌
+          headers:
+            Authorization:
+              description: Bearer 登录令牌
+              schema:
+                type: string
+                example: Bearer eyJhbGciOi...
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+              example:
+                code: 1
+                msg: success
+                data: eyJhbGciOi...
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/logout:
+    post:
+      tags: [User]
+      summary: 用户登出
+      operationId: logoutUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      responses:
+        '200':
+          description: 退出成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/update:
+    post:
+      tags: [User]
+      summary: 修改用户信息
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/avatar:
+    post:
+      tags: [User]
+      summary: 上传或修改用户头像
+      operationId: updateUserAvatar
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 头像文件，仅支持 image/*，最大 5MB
+      responses:
+        '200':
+          description: 头像修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/info:
+    get:
+      tags: [User]
+      summary: 查看用户信息
+      operationId: getUserInfo
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 用户ID
+      responses:
+        '200':
+          description: 用户信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/delete:
+    delete:
+      tags: [User]
+      summary: 注销当前登录账号
+      operationId: deleteMe
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      responses:
+        '200':
+          description: 注销成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/remove:
+    delete:
+      tags: [User]
+      summary: 管理员封禁用户
+      description: 需要 @RequireRole(2)。
+      operationId: removeUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 被封禁用户ID
+      responses:
+        '200':
+          description: 封号成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/promote:
+    post:
+      tags: [User]
+      summary: 管理员修改用户角色
+      description: 需要 @RequireRole(2)。
+      operationId: promoteUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: role
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: 新角色等级
+      responses:
+        '200':
+          description: 提权成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/get/id:
+    get:
+      tags: [Video]
+      summary: 根据视频ID查看视频
+      operationId: getVideoById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 视频ID
+      responses:
+        '200':
+          description: 视频详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Video'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/get/title:
+    get:
+      tags: [Video]
+      summary: 根据标题分页搜索视频
+      operationId: searchVideosByTitle
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: title
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 标题关键字，空值表示查询全部
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: 视频分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VideoPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/get/category:
+    get:
+      tags: [Video]
+      summary: 根据分区分页查询视频
+      operationId: getVideosByCategory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: categoryId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 分类ID
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: 视频分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VideoPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/post:
+    post:
+      tags: [Video]
+      summary: 上传并发布视频
+      operationId: postVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, file]
+              properties:
+                title:
+                  type: string
+                  description: 视频标题
+                description:
+                  type: string
+                  description: 视频描述
+                categoryId:
+                  type: integer
+                  format: int64
+                  description: 分类ID
+                file:
+                  type: string
+                  format: binary
+                  description: 视频文件，仅允许 video/*，最大 500MB
+      responses:
+        '200':
+          description: 发布成功，返回保存后的视频对象
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Video'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/delete:
+    delete:
+      tags: [Video]
+      summary: 删除视频并删除 OSS 文件
+      operationId: deleteVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/changeLikes:
+    post:
+      tags: [Video]
+      summary: 点赞或取消点赞视频
+      operationId: changeVideoLikes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /admin/video/view-count/flush:
+    post:
+      tags: [Admin]
+      summary: 手动刷新 Redis 播放量增量到 MySQL
+      operationId: flushVideoViewCount
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      responses:
+        '200':
+          description: 播放量刷库成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /favorite/add:
+    post:
+      tags: [Favorite]
+      summary: 收藏视频
+      operationId: addFavorite
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 收藏成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /favorite/cancel:
+    delete:
+      tags: [Favorite]
+      summary: 取消收藏视频
+      operationId: cancelFavorite
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 取消收藏成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /favorite/check:
+    get:
+      tags: [Favorite]
+      summary: 查询当前用户是否收藏视频
+      operationId: checkFavorite
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 是否收藏
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        type: boolean
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /category/list:
+    get:
+      tags: [Category]
+      summary: 查询启用的视频分区列表
+      operationId: listCategories
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      responses:
+        '200':
+          description: 分区列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Category'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /comment/list:
+    get:
+      tags: [Comment]
+      summary: 分页查询视频评论，两级结构返回
+      operationId: listComments
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: 评论分页列表，一级评论 records，每条评论 replies 为子评论平铺列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /comment/add:
+    post:
+      tags: [Comment]
+      summary: 发布评论或子评论
+      operationId: addComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: parentId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 被回复评论ID；为空表示发布一级评论
+        - name: content
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 发表成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /comment/delete:
+    delete:
+      tags: [Comment]
+      summary: 逻辑删除评论
+      operationId: deleteComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: commentId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /comment/update:
+    post:
+      tags: [Comment]
+      summary: 点赞或取消点赞评论
+      operationId: updateCommentLikes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: commentId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /follow/followings:
+    get:
+      tags: [Follow]
+      summary: 查询用户关注列表
+      operationId: findFollowings
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 用户分页列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPageResultResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /follow/followers:
+    get:
+      tags: [Follow]
+      summary: 查询用户粉丝列表
+      operationId: findFollowers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 用户分页列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPageResultResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /follow/friends:
+    get:
+      tags: [Follow]
+      summary: 查询互相关注好友列表
+      operationId: findFriends
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 用户分页列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPageResultResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /follow/isFollow:
+    get:
+      tags: [Follow]
+      summary: 判断当前用户是否关注目标用户
+      operationId: isFollow
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: followingId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 被关注用户ID
+      responses:
+        '200':
+          description: 是否已关注
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        type: boolean
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /follow/changeFollow:
+    post:
+      tags: [Follow]
+      summary: 关注或取消关注
+      operationId: changeFollow
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: FollowingId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 目标用户ID；参数名按当前 Controller 大写 F 保留
+      responses:
+        '200':
+          description: 修改关注成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    AuthorizationHeader:
+      name: Authorization
+      in: header
+      required: true
+      schema:
+        type: string
+        example: Bearer eyJhbGciOi...
+      description: 标准 Bearer Token 请求头。
+    Page:
+      name: page
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: 页码，从 1 开始
+    PageSize:
+      name: pageSize
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        default: 10
+      description: 每页数量
+    Sort:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [time, hot]
+        default: time
+      description: 排序方式，time 按 create_time DESC，hot 按 hot_score DESC
+    UserId:
+      name: userId
+      in: query
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: 用户ID
+
+  responses:
+    ErrorResponse:
+      description: 业务或系统错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResult'
+          example:
+            code: 0
+            msg: 系统繁忙，请稍后再试
+            data: null
+    UnauthorizedResponse:
+      description: 未登录或 token 无效
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: Please login first
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResult'
+    ForbiddenResponse:
+      description: 权限不足
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResult'
+          example:
+            code: 0
+            msg: 权限不足，请联系香草管理员
+            data: null
+
+  schemas:
+    BaseResult:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 1成功，0失败
+          example: 1
+        msg:
+          type: string
+          nullable: true
+          example: success
+        data:
+          nullable: true
+      required: [code]
+
+    StringResult:
+      allOf:
+        - $ref: '#/components/schemas/BaseResult'
+        - type: object
+          properties:
+            data:
+              type: string
+              nullable: true
+
+    ErrorResult:
+      allOf:
+        - $ref: '#/components/schemas/BaseResult'
+        - type: object
+          properties:
+            code:
+              type: integer
+              example: 0
+            msg:
+              type: string
+            data:
+              nullable: true
+
+    PageResult:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        records:
+          type: array
+          items: {}
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        role:
+          type: integer
+          description: 角色等级
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          description: 头像访问地址
+        avatarObjectKey:
+          type: string
+          description: 头像 OSS 对象 Key
+        creatUser:
+          type: string
+        updateUser:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+        updateTime:
+          type: string
+          format: date-time
+
+    UserRegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        nickname:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        nickname:
+          type: string
+
+    Video:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        videoUrl:
+          type: string
+          format: uri
+        objectKey:
+          type: string
+        size:
+          type: integer
+          format: int64
+        status:
+          type: string
+          example: PUBLISHED
+        likesCount:
+          type: integer
+          format: int64
+        commentCount:
+          type: integer
+          format: int64
+        favoriteCount:
+          type: integer
+          format: int64
+        viewCount:
+          type: integer
+          format: int64
+        hotScore:
+          type: number
+          format: double
+        createTime:
+          type: string
+          format: date-time
+        updateTime:
+          type: string
+          format: date-time
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        sort:
+          type: integer
+        status:
+          type: integer
+        createTime:
+          type: string
+          format: date-time
+        updateTime:
+          type: string
+          format: date-time
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        videoId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          nullable: true
+        rootId:
+          type: integer
+          format: int64
+          nullable: true
+        replyToUserId:
+          type: integer
+          format: int64
+          nullable: true
+        content:
+          type: string
+          description: deleted=1 时后端返回“该评论已删除”
+        likesCount:
+          type: integer
+          format: int64
+        replyCount:
+          type: integer
+          format: int64
+        hotScore:
+          type: number
+          format: double
+        deleted:
+          type: integer
+          enum: [0, 1]
+        createTime:
+          type: string
+          format: date-time
+        username:
+          type: string
+        nickname:
+          type: string
+        replyToUsername:
+          type: string
+          nullable: true
+        replyToNickname:
+          type: string
+          nullable: true
+        replies:
+          type: array
+          description: 子评论平铺列表，不递归嵌套
+          items:
+            $ref: '#/components/schemas/CommentReply'
+
+    CommentReply:
+      allOf:
+        - $ref: '#/components/schemas/Comment'
+      description: 子评论对象；其 replies 通常为空。
+
+    VideoPageResult:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/Video'
+
+    CommentPageResult:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+
+    UserPageResult:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+
+    UserPageResultResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResult'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/UserPageResult'

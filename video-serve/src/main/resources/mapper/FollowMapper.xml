@@ -7,6 +7,7 @@
         u.id,
         u.username,
         u.nickname,
+        u.avatar_url AS avatarUrl,
         f.create_time AS followTime
         FROM user_follow f
         LEFT JOIN user u ON f.follower_id = u.id
@@ -21,6 +22,7 @@
         u.id,
         u.username,
         u.nickname,
+        u.avatar_url AS avatarUrl,
         f.create_time AS followTime
         FROM user_follow f
         LEFT JOIN user u ON f.following_id = u.id
@@ -34,7 +36,8 @@
         SELECT
         u.id,
         u.username,
-        u.nickname
+        u.nickname,
+        u.avatar_url AS avatarUrl
         FROM user_follow f1
         INNER JOIN user_follow f2 ON f1.follower_id = f2.following_id
         AND f1.following_id = f2.follower_id
@@ -75,7 +78,7 @@
 
     <!--添加关注-->
     <insert id="follow">
-        INSERT INTO user_follow (following_id, follower_id, create_time)
+        INSERT IGNORE INTO user_follow (following_id, follower_id, create_time)
         VALUES (?, ?, NOW())
     </insert>
 
@@ -84,5 +87,40 @@
         DELETE FROM user_follow
         WHERE following_id = ? AND follower_id = ?
     </delete>
+
+    <select id="findFollowingRelations" resultType="com.video.pojo.entity.UserFollow">
+        SELECT
+        id,
+        follower_id AS followerId,
+        following_id AS followingId,
+        create_time AS createTime
+        FROM user_follow
+        WHERE follower_id = ?
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="findFollowerRelations" resultType="com.video.pojo.entity.UserFollow">
+        SELECT
+        id,
+        follower_id AS followerId,
+        following_id AS followingId,
+        create_time AS createTime
+        FROM user_follow
+        WHERE following_id = ?
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="findFriendRelations" resultType="com.video.pojo.entity.UserFollow">
+        SELECT
+        f1.id,
+        f1.follower_id AS followerId,
+        f1.following_id AS followingId,
+        f1.create_time AS createTime
+        FROM user_follow f1
+        INNER JOIN user_follow f2 ON f1.follower_id = f2.following_id
+        AND f1.following_id = f2.follower_id
+        WHERE f1.follower_id = ?
+        ORDER BY f1.create_time DESC
+    </select>
 
 </mapper>

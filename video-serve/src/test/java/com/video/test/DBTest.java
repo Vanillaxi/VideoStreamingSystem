@@ -2,9 +2,7 @@ package com.video.test;
 
 import com.video.config.DBPool;
 import org.junit.Test;
-
 import java.sql.Connection;
-
 public class DBTest {
 
     @Test

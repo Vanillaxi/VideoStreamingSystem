@@ -5,11 +5,13 @@ import com.video.annotation.MyMapping;
 import com.video.exception.BaseException;
 import com.video.pojo.dto.Result;
 import com.video.proxy.BeanFactory;
+import com.video.utils.AuthHeaderUtil;
 import com.video.utils.JSONUtil;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -86,6 +88,9 @@ public abstract class BaseController extends HttpServlet {
                     args[i] = req;
                 } else if (type == HttpServletResponse.class) {
                     args[i] = resp;
+                } else if (type == Part.class) {
+                    String paramName = handler.getParameters()[i].getName();
+                    args[i] = req.getPart(paramName);
                 } else if (isBasicType(type)) {
                     String paramName = handler.getParameters()[i].getName();
                     args[i] = convertBasicType(req.getParameter(paramName), type);
@@ -126,13 +131,17 @@ public abstract class BaseController extends HttpServlet {
             handler.setAccessible(true);
             Object result = handler.invoke(this, args);
 
+            if (result == null || resp.isCommitted()) {
+                return;
+            }
+
             Result finalResult;
 
             if (result instanceof Result) {
                 finalResult = (Result) result;
                 // 登录特殊处理：自动塞 Header
                 if (finalResult.getCode() == 200 && finalResult.getData() instanceof String && "/login".equals(path)) {
-                    resp.setHeader("token", (String) finalResult.getData());
+                    resp.setHeader("Authorization", AuthHeaderUtil.buildBearerValue((String) finalResult.getData()));
                 }
             } else {
                 // 如果返回的是普通对象或 null，包一层 Result.success
@@ -149,6 +158,7 @@ public abstract class BaseController extends HttpServlet {
                 log.warn("业务异常 [{}]: {}", path, cause.getMessage());
                 resp.getWriter().write(JSONUtil.toJson(Result.error(cause.getMessage())));
             } else {
+                log.error("系统崩溃", e);
                 log.error("系统崩溃 [{}]: ", path, cause);
                 resp.getWriter().write(JSONUtil.toJson(Result.error("系统繁忙，请稍后再试")));
             }

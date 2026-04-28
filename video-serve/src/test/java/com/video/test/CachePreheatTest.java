@@ -5,7 +5,7 @@ import com.video.proxy.BeanFactory;
 import com.video.mapper.VideoMapper;
 import com.video.pojo.entity.Video;
 import com.video.utils.CacheClient;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 import java.util.concurrent.TimeUnit;
 
 

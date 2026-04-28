@@ -6,11 +6,16 @@ import com.video.pojo.dto.PageResult;
 import com.video.pojo.entity.Video;
 import com.video.pojo.dto.Result;
 import com.video.service.VideoService;
+import com.video.utils.OssClientUtil;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.Part;
 import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
 
 @Slf4j
 @WebServlet("/video/*")
+@MultipartConfig(maxFileSize = 500 * 1024 * 1024L, maxRequestSize = 520 * 1024 * 1024L)
 public class VideoController extends BaseController {
     @MyAutowired
     private VideoService videoService;
@@ -32,22 +37,86 @@ public class VideoController extends BaseController {
      * @return
      */
     @MyMapping (value="/get/title",method="GET")
-    public Result getVideoTitle(String title, int page, int pageSize){
-        PageResult pageResult=videoService.getVideoTitle(title,page,pageSize);
+    public Result getVideoTitle(String title, int page, int pageSize, String sort){
+        PageResult pageResult=videoService.getVideoTitle(title,page,pageSize,sort);
+        return Result.success(pageResult);
+    }
+
+    /**
+     * 首页热门视频 Top50
+     */
+    @MyMapping(value = "/list/hot", method = "GET")
+    public Result getHotTop50() {
+        return Result.success(videoService.getHotTop50());
+    }
+
+    /**
+     * 最新视频列表
+     */
+    @MyMapping(value = "/list/new", method = "GET")
+    public Result getNewestVideos(int page, int pageSize) {
+        return Result.success(videoService.getNewestVideos(page, pageSize));
+    }
+
+    /**
+     * 根据分区查询视频
+     * @param categoryId
+     * @return
+     */
+    @MyMapping(value = "/get/category", method = "GET")
+    public Result getVideoByCategory(Long categoryId, int page, int pageSize, String sort) {
+        PageResult pageResult = videoService.getVideoByCategoryId(categoryId, page, pageSize, sort);
         return Result.success(pageResult);
     }
 
 
     /**
      * 发布视频
-     * @param video
+     * @param title
+     * @param file
      * @return
      */
     @MyMapping(value = "/post", method = "POST")
-    public Result postVideo(Video video){
+    public Result postVideo(String title, String description, Long categoryId, Part file){
+        if (title == null || title.isBlank()) {
+            return Result.error("视频标题不能为空");
+        }
+
+        OssClientUtil.UploadedObject uploadedObject;
+        try {
+            uploadedObject = new OssClientUtil().uploadVideo(file);
+        } catch (IllegalArgumentException | IllegalStateException | IOException e) {
+            log.warn("视频上传失败: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        }
+
+        Video video = new Video();
+
+        video.setTitle(title);
+        video.setDescription(description);
+        video.setCategoryId(categoryId);
+        video.setVideoUrl(uploadedObject.getUrl());
+        video.setObjectKey(uploadedObject.getObjectKey());
+        video.setSize(uploadedObject.getSize());
+        video.setStatus("PUBLISHED");
         video.setLikesCount(0L);
+        video.setCommentCount(0L);
+        video.setFavoriteCount(0L);
+        video.setViewCount(0L);
         videoService.postVideo(video);
-        return Result.success("发布成功");
+        return Result.success(video);
+    }
+
+
+    /**
+     * 删除视频，同时删除 OSS 文件。
+     * @param videoId
+     * @return
+     */
+    @MyMapping(value = "/delete", method = "DELETE")
+    public Result deleteVideo(Long videoId) {
+        videoService.deleteVideo(videoId);
+        return Result.success("删除成功");
     }
 
     /**

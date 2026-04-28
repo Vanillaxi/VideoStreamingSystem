@@ -6,6 +6,7 @@ import com.video.pojo.entity.User;
 import com.video.mapper.UserMapper;
 import com.video.utils.JdbcUtils;
 import com.video.utils.XmlSqlReaderUtil;
+import java.util.Collections;
 import java.util.List;
 
 import static com.video.utils.JdbcUtils.executeUpdate;
@@ -16,7 +17,15 @@ public class UserMapperImpl implements UserMapper {
     @Override
     public void insert(User user) {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.insert");
-        JdbcUtils.executeUpdate(sql, user.getUsername(), user.getPassword(), user.getRole(),user.getNickname(),user.getCreatUser(),user.getUpdateUser());
+        JdbcUtils.executeUpdate(sql,
+                user.getUsername(),
+                user.getPassword(),
+                user.getRole(),
+                user.getNickname(),
+                user.getAvatarUrl(),
+                user.getAvatarObjectKey(),
+                user.getCreatUser(),
+                user.getUpdateUser());
     }
 
     @Override
@@ -42,9 +51,28 @@ public class UserMapperImpl implements UserMapper {
     }
 
     @Override
+    public List<User> getByIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String sqlTemplate = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.getByIds");
+        String placeholders = String.join(",", Collections.nCopies(userIds.size(), "?"));
+        String sql = String.format(sqlTemplate, placeholders);
+        return JdbcUtils.executeQuery(User.class, sql, userIds.toArray());
+    }
+
+    @Override
     public void update(User user) {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.update");
-        executeUpdate(sql,user.getUsername(), user.getPassword(), user.getNickname(),user.getRole(), user.getUpdateUser(), user.getId());
+        executeUpdate(sql,
+                user.getUsername(),
+                user.getPassword(),
+                user.getNickname(),
+                user.getAvatarUrl(),
+                user.getAvatarObjectKey(),
+                user.getRole(),
+                user.getUpdateUser(),
+                user.getId());
     }
 
     @Override

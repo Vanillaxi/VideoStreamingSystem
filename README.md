@@ -1,104 +1,71 @@
-#  VideoStreamingSystem - 视频推流系统
+# VideoStreamingSystem
 
+一个不依赖 Spring / Spring Boot 的视频系统后端项目。项目使用 Servlet + 自定义 IOC / MVC / XML SQL 映射实现后端能力，支持视频上传到阿里云 OSS、评论、收藏、关注、热度排序、Redis 缓存和播放量异步累计。
 
+## 项目特点
 
-## 项目简介
+- 自定义 IOC：`@MyComponent`、`@MyAutowired`、`BeanFactory`
+- 自定义 MVC：`@MyMapping`、`BaseController`、参数绑定、统一 `Result` 响应
+- 自定义权限：`@RequireRole` + JWT + `LoginFilter`
+- XML SQL 映射：类似 MyBatis 的 SQL 与 Java 分离
+- 非 Spring Boot：运行在 Tomcat 10，使用 `jakarta.servlet`
+- MySQL 为最终数据源，Redis 作为缓存 / 索引 / 异步计数层
 
-本项目是一个**完全手写框架**的视频推流后端系统，**不依赖 Spring 任何组件**，从零实现了：
+## 技术栈
 
--  **自定义 IOC 容器** — 注解扫描、Bean 管理、依赖注入
--  **自定义 AOP 切面编程** — JDK 动态代理实现 Service 层拦截
--  **自定义 MVC 框架** — 路由映射、参数绑定、统一响应
-- **自定义 ORM 映射** — XML SQL 解析（类 MyBatis 思想）
+| 技术 | 说明 |
+| --- | --- |
+| JDK 17 | 项目编译运行环境 |
+| Maven | 构建与依赖管理 |
+| Tomcat 10.1 | Servlet 容器 |
+| MySQL 8 | 主数据源 |
+| Redis | 缓存、ZSet 索引、播放量累计 |
+| 阿里云 OSS | 视频文件和头像文件存储 |
+| JWT | 登录认证，使用 `Authorization: Bearer {token}` |
+| BCrypt | 用户密码加密 |
+| Logback | 日志 |
 
+## 当前功能
 
+| 模块 | 功能 |
+| --- | --- |
+| 用户 | 注册、登录、登出、修改资料、上传头像、查询用户、封号、提权 |
+| 视频 | 本地视频文件上传、OSS 存储、查询详情、标题搜索、分区查询、热门 Top50、最新列表、删除视频 |
+| 分类 | 查询启用分类列表 |
+| 评论 | 一级评论、子评论/楼中楼、两级结构返回、逻辑删除、点赞、按时间/热度排序 |
+| 收藏 | 收藏、取消收藏、是否收藏、收藏列表，MySQL + Redis ZSet |
+| 关注 | 关注、取关、关注列表、粉丝列表、互关列表、是否关注，MySQL + Redis ZSet |
+| 热度 | 视频和评论 `hot_score`，支持 `sort=time` / `sort=hot` |
+| 播放量 | 详情页 Redis `INCR`，定时 / 手动异步刷入 MySQL |
+| 缓存 | 视频详情、热门列表、最新第一页、分类第一页、评论第一页 |
 
----
+## 核心目录
 
-##  核心功能模块
-
-| 模块         | 功能描述                                                  |
-| ------------ | --------------------------------------------------------- |
-| **用户系统** | 注册 / 登录 / 登出 / 信息修改 / 账号注销 / 角色权限管理   |
-| **视频管理** | 发布视频 / 按ID查询 / 模糊搜索 / 点赞                     |
-| **评论系统** | 发表评论 / 分页查看(含点赞数) / 删除评论 / 评论点赞       |
-| **关注系统** | 关注/取关 / 关注列表 / 粉丝列表 / 互粉列表 / 是否关注判断 |
-| **安全机制** | JWT Token 认证 + BCrypt 密码加密 + RBAC 权限控制          |
-| **缓存策略** | Redis 缓存热点数据，减轻数据库压力                        |
-
----
-
-
-
-### 核心组件
-
-| 组件             | 说明                                | 对应文件                                                     |
-| ---------------- | ----------------------------------- | ------------------------------------------------------------ |
-| `@MyComponent`   | Bean 标记注解                       | [MyComponent.java](video-serve/src/main/java/com/video/annotation/MyComponent.java) |
-| `@MyAutowired`   | 依赖注入注解                        | [MyAutowired.java](video-serve/src/main/java/com/video/annotation/MyAutowired.java) |
-| `@MyMapping`     | 路由映射注解 (支持 GET/POST/DELETE) | [MyMapping.java](video-serve/src/main/java/com/video/annotation/MyMapping.java) |
-| `@MyHeader`      | 请求头参数绑定注解                  | [MyHeader.java](video-serve/src/main/java/com/video/annotation/MyHeader.java) |
-| `@RequireRole`   | 角色权限校验注解                    | [RequireRole.java](video-serve/src/main/java/com/video/annotation/RequireRole.java) |
-| `BeanFactory`    | IOC 容器核心 (扫描/实例化/DI/AOP)   | [BeanFactory.java](video-serve/src/main/java/com/video/proxy/BeanFactory.java) |
-| `ServiceProxy`   | JDK 动态代理 (AOP 切面)             | [ServiceProxy.java](video-serve/src/main/java/com/video/proxy/ServiceProxy.java) |
-| `BaseController` | 自定义 MVC 基类 (路由分发/参数解析) | [BaseController.java](video-serve/src/main/java/com/video/controller/BaseController.java) |
-
----
-
-##  技术栈
-
-*  MySQL数据库：实现数据的持久化
-
-* Redis 缓存：加速数据的访问
-
-* BCrypt 加密
-
-  
-
----
-
-
-
-## 快速开始
-
-### 环境要求
-
-| 依赖       | 版本要求 | 说明                               |
-| ---------- | -------- | ---------------------------------- |
-| **JDK**    | 17+      | 推荐 OpenJDK 17                    |
-| **Maven**  | 3.8+     | 项目构建与依赖管理                 |
-| **MySQL**  | 8.0.x    | 关系型数据库                       |
-| **Redis**  | 6.0+     | 缓存中间件                         |
-| **Tomcat** | 10.1.x   | Servlet 容器 (使用 `jakarta` 包名) |
-
-###  克隆项目
-
-```bash
-git clone https://github.com/你的用户名/VideoStreamingSystem.git
-cd VideoStreamingSystem
+```text
+video-serve/src/main/java/com/video
+├── annotation      # 自定义注解
+├── config          # DB/Redis/Servlet 容器启动监听
+├── controller      # Servlet Controller
+├── filter          # 登录过滤器
+├── mapper          # Mapper 接口与实现
+├── pojo            # entity / dto
+├── proxy           # BeanFactory / AOP 代理
+├── service         # Service 接口与实现
+├── task            # 定时任务
+└── utils           # JWT、Redis、OSS、XML SQL、Lua 等工具
 ```
 
-###  
+## 配置
 
-### 数据库初始化
+本地敏感配置文件位于：
 
-**该脚本暂未更新，请自行编写**
+```text
+video-serve/src/main/resources/properties/
+```
 
-结构：
+请参考 `.example` 文件创建本地配置。
 
-- `user` — 用户表（含角色权限字段）
-- `videos` — 视频表
-- `user_follow` — 关注关系表
-- `video_like` — 视频点赞表
-- `comments` — 评论表
-
-
-
-###  配置文件
-
-项目敏感配置已通过 `.gitignore` 忽略。请根据 `properties/` 目录下的 `.example` 文件创建本地配置：
-
-#### DB.properties — 数据库连接
+### DB.properties
 
 ```properties
 db.url=jdbc:mysql://localhost:3306/Video?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
@@ -106,15 +73,7 @@ db.username=root
 db.password=your_password
 ```
 
-#### JWT.properties — JWT 配置
-
-```properties
-jwt.secret=your_very_long_and_complex_secret_key_here
-jwt.ttl=604800000
-jwt.tokenName=token
-```
-
-#### Redis.properties — Redis 连接
+### Redis.properties
 
 ```properties
 redis.host=localhost
@@ -125,81 +84,278 @@ redis.maxTotal=20
 redis.maxIdle=10
 ```
 
-###  构建与部署
+### JWT.properties
 
-```bash
-# Maven 打包
-mvn clean package -DskipTests
+当前 token 过期时间为 1 小时：
 
-# 将生成的 video-serve.war 部署到 Tomcat webapps 目录
-# 启动 Tomcat，访问 http://localhost:8080/video-serve/
+```properties
+jwt.secret=your_very_long_secret
+jwt.ttl=3600000
+jwt.tokenName=token
 ```
 
----
+### OSS.properties
 
-##  API 接口文档
+AccessKey 从环境变量读取，不要写进配置文件：
 
-本项目提供完整的 RESTful API，支持在线调试：
+```properties
+oss.endpoint=oss-cn-hangzhou.aliyuncs.com
+oss.bucket=video-streaming-system
+oss.domain=https://video-streaming-system.oss-cn-hangzhou.aliyuncs.com
+```
 
-🔗 **[Apifox 在线文档](https://s.apifox.cn/3e7de016-3c19-4e6a-91e1-1558a9781ee7)**
+本地环境变量：
 
----
+```bash
+export OSS_ACCESS_KEY_ID=your_access_key_id
+export OSS_ACCESS_KEY_SECRET=your_access_key_secret
+```
 
+## 数据库
 
+从 0 建库使用：
 
-##  核心设计
+```text
+video-serve/src/main/resources/db/init.sql
+```
 
-### 1. 自定义 IOC 容器
+已有数据库升级使用 migration，不要删库重建：
 
-通过 `BeanFactory` 实现 Spring Core 的核心功能：
+```text
+sql/migration/20260427_add_favorite_category.sql
+sql/migration/20260427_add_hot_score.sql
+sql/migration/20260428_add_unique_indexes_for_actions.sql
+```
 
-- **包扫描**: 递归扫描指定包下带 `@MyComponent` 注解的类
-- **单例管理**: 使用 Map 维护 Bean 单例池
-- **依赖注入**: 通过 `@MyAutowired` 按类型自动装配
-- **AOP 包装**: 对所有 ServiceImpl 创建 JDK 动态代理
+建议按时间顺序执行。
 
-### 2. 自定义 MVC 框架
+## Redis 设计
 
-`BaseController` 作为所有 Controller 的基类：
+### 视频缓存
 
-- **路由分发**: 通过 `@MyMapping` 注解实现方法级路由映射
-- **参数绑定**: 支持 QueryParam、RequestBody、Header 参数自动绑定
-- **统一响应**: 所有接口返回标准 `Result` 格式
-- **异常处理**: 全局捕获业务异常和系统异常
+| key | 说明 | TTL |
+| --- | --- | --- |
+| `video:list:hot` | 首页热门 Top50 | 逻辑过期 60 秒 |
+| `video:list:new` | 最新视频第一页 | 逻辑过期 60 秒 |
+| `video:list:category:{categoryId}` | 分类视频第一页 | 逻辑过期 60 秒 |
+| `video:detail:{videoId}` | 视频详情 | 逻辑过期 300 秒 |
 
-### 3. XML SQL 映射
+### 评论缓存
 
-仿 MyBatis 设计，使用 dom4j 解析 XML 中的 SQL 语句，实现 SQL 与代码分离。
+只缓存第一页：
 
-### 4. 多层安全防护
+```text
+comment:list:video:{videoId}:page1:time
+comment:list:video:{videoId}:page1:hot
+```
 
-- **JWT Token**: 无状态认证，支持过期时间配置
-- **BCrypt 加密**: 密码单向哈希存储
-- **RBAC 权限**: 基于 `@RequireRole` 注解的角色级别控制
-- **LoginFilter**: 过滤器链实现请求拦截
+TTL：逻辑过期 60 秒。
 
----
+### 收藏 ZSet
 
-##  开发指南
+```text
+favorite:video:user:{userId}
+```
 
-### 运行测试
+- member：`videoId`
+- score：收藏时间戳
+- 不设置过期时间
+- key 不存在时从 MySQL 重建
 
-项目包含单元测试，覆盖以下场景：
+### 关注 ZSet
+
+```text
+user:following:{userId}
+user:followers:{userId}
+user:friends:{userId}
+```
+
+- member：用户 ID
+- score：关注时间戳
+- 不设置过期时间
+- key 不存在时从 MySQL 重建
+
+### 播放量累计
+
+详情页访问时只写 Redis：
+
+```text
+video:view:count:{videoId}
+```
+
+每 1 分钟定时刷入 MySQL，也可以手动调用管理接口刷库。
+
+Lua 脚本独立存放：
+
+```text
+video-serve/src/main/resources/lua/get_and_del.lua
+```
+
+用于原子读取并删除播放量增量 key，避免 `GET` 后 `DEL` 之间新增播放量被误删。
+
+## 热度计算
+
+视频热度：
+
+```text
+hot_score = like_count * 3
+          + comment_count * 5
+          + favorite_count * 4
+          + view_count * 1
+          + 时间衰减
+```
+
+评论热度：
+
+```text
+hot_score = like_count * 3
+          + reply_count * 5
+          + 时间衰减
+```
+
+当前时间衰减在 SQL 中计算：
+
+```sql
+GREATEST(0, 100 - TIMESTAMPDIFF(HOUR, create_time, NOW()))
+```
+
+## 主要接口
+
+完整 OpenAPI 文档：
+
+```text
+openapi.yaml
+```
+
+可直接导入 Apifox。
+
+认证请求头：
+
+```http
+Authorization: Bearer {token}
+```
+
+### 用户
+
+```text
+POST   /user/register
+POST   /user/login
+POST   /user/logout
+POST   /user/update
+POST   /user/avatar
+GET    /user/info
+DELETE /user/delete
+DELETE /user/remove
+POST   /user/promote
+```
+
+### 视频
+
+```text
+GET    /video/get/id
+GET    /video/get/title?title=&page=&pageSize=&sort=time|hot
+GET    /video/list/hot
+GET    /video/list/new?page=&pageSize=
+GET    /video/get/category?categoryId=&page=&pageSize=&sort=time|hot
+POST   /video/post
+DELETE /video/delete
+POST   /video/changeLikes
+```
+
+视频上传使用 `multipart/form-data`，字段包括：
+
+```text
+title
+description
+categoryId
+file
+```
+
+### 评论
+
+```text
+GET    /comment/list?videoId=&page=&pageSize=&sort=time|hot
+POST   /comment/add
+DELETE /comment/delete
+POST   /comment/update
+```
+
+### 收藏
+
+```text
+POST   /favorite/add
+DELETE /favorite/cancel
+GET    /favorite/check
+GET    /favorite/list?page=&pageSize=
+```
+
+### 分类
+
+```text
+GET /category/list
+```
+
+### 关注
+
+```text
+GET  /follow/followings
+GET  /follow/followers
+GET  /follow/friends
+GET  /follow/isFollow
+POST /follow/changeFollow
+```
+
+### 管理
+
+```text
+POST /admin/video/view-count/flush
+```
+
+用于手动触发播放量 Redis 增量刷库，需要管理员角色。
+
+## 并发安全
+
+- MySQL 是最终数据源
+- Redis 只作为缓存 / 索引
+- 点赞、收藏、关注均依赖唯一索引防止重复操作
+- 写操作先提交 MySQL，再更新 Redis
+- Redis 更新失败不回滚 MySQL，后续可从 MySQL 重建
+- 播放量刷库使用 Lua 原子 get-and-delete；MySQL 更新失败会 `INCRBY` 补回 Redis
+
+## 构建与运行
+
+```bash
+mvn clean package
+```
+
+生成 WAR 后部署到 Tomcat 10：
+
+```text
+video-serve/target/video-serve.war
+```
+
+本地访问示例：
+
+```text
+http://localhost:8080/video-serve
+```
+
+## 测试
 
 ```bash
 mvn test
 ```
 
-测试用例位于 [test/java/com/video/test/](video-serve/src/test/java/com/video/test/)：
+当前测试覆盖：
 
-- `IocTest` — IOC 容器测试
-- `DBTest` — 数据库连接测试
-- `RedisTest` — Redis 连接测试
-- `CachePreheatTest` — 缓存预热测试
+- IOC 容器基础加载
+- XML SQL 映射加载
+- OSS 文件校验与 Content-Type 推断
+- Live OSS 测试按条件跳过
 
-### 日志配置
+## 注意事项
 
-日志通过 Logback 配置，配置文件：[logback.xml](video-serve/src/main/resources/logback.xml)
-
-
-
+- 当前项目不是 Spring Boot，不使用 Spring 注解。
+- 运行上传视频 / 头像功能前，需要配置阿里云 OSS 环境变量。
+- 修改已有数据库请执行 `sql/migration/`，不要直接删库重建。
+- `openapi.yaml` 是接口调试入口，建议导入 Apifox 使用。

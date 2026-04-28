@@ -5,8 +5,10 @@ import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
 import com.video.exception.NotAllowFollowException;
 import com.video.mapper.FollowMapper;
+import com.video.mapper.UserMapper;
 import com.video.pojo.dto.PageResult;
 import com.video.pojo.entity.User;
+import com.video.pojo.entity.UserFollow;
 import com.video.service.FollowService;
 import com.video.utils.CacheClient;
 import com.video.utils.RedisUtil;
@@ -14,16 +16,28 @@ import com.video.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @MyComponent
 public class FollowServiceImpl implements FollowService {
+    private static final String FOLLOWING_PREFIX = "user:following:";
+    private static final String FOLLOWER_PREFIX = "user:followers:";
+    private static final String FRIEND_PREFIX = "user:friends:";
+
     @MyAutowired
     private CacheClient cacheClient;
 
     @MyAutowired
     private FollowMapper followMapper;
+
+    @MyAutowired
+    private UserMapper userMapper;
 
     /**
      * 我的关注
@@ -32,15 +46,11 @@ public class FollowServiceImpl implements FollowService {
      */
     @Override
     public PageResult findFollowings(Long userId, int page, int pageSize) {
-        Long total = followMapper.countFollowings(userId);
-
-        if (total == null || total == 0) {
-            return new PageResult(0L, new ArrayList<>());
+        String key = followingKey(userId);
+        if (!RedisUtil.exists(key)) {
+            rebuildFollowingRedis(userId);
         }
-
-        int offset = (page - 1) * pageSize;
-        List<User> userList = followMapper.findFollowings( userId, offset, pageSize);
-        return new PageResult(total, userList);
+        return getUsersFromZSet(key, page, pageSize);
     }
 
     /**
@@ -50,15 +60,11 @@ public class FollowServiceImpl implements FollowService {
      */
     @Override
     public PageResult findFollowers(Long userId, int page, int pageSize){
-        Long total = followMapper.countFollowers(userId);
-
-        if (total == null || total == 0) {
-            return new PageResult(0L, new ArrayList<>());
+        String key = followerKey(userId);
+        if (!RedisUtil.exists(key)) {
+            rebuildFollowerRedis(userId);
         }
-
-        int offset = (page - 1) * pageSize;
-        List<User> userList = followMapper.findFollowers( userId, offset, pageSize);
-        return new PageResult(total, userList);
+        return getUsersFromZSet(key, page, pageSize);
     }
 
     /**
@@ -70,15 +76,11 @@ public class FollowServiceImpl implements FollowService {
      */
     @Override
     public PageResult findFriends(Long userId, int page, int pageSize) {
-        Long total = followMapper.countFriends(userId);
-
-        if (total == null || total == 0) {
-            return new PageResult(0L, new ArrayList<>());
+        String key = friendKey(userId);
+        if (!RedisUtil.exists(key)) {
+            rebuildFriendRedis(userId);
         }
-
-        int offset = (page - 1) * pageSize;
-        List<User> userList = followMapper.findFriends( userId, offset, pageSize);
-        return new PageResult(total, userList);
+        return getUsersFromZSet(key, page, pageSize);
     }
 
 
@@ -92,24 +94,19 @@ public class FollowServiceImpl implements FollowService {
         if(myId.equals(targetUserId)){
             throw new NotAllowFollowException();
         }
-        String followingKey = "user:following:" + myId;
-        String followerKey = "user:followers:" + targetUserId;
-
-        Double score = RedisUtil.zscore(followingKey, targetUserId.toString());
-
-        if (score == null) {
-            Long rows = followMapper.follow( targetUserId,myId);
-            if(rows>0){
-                double now = (double) System.currentTimeMillis();
-                RedisUtil.zadd(followingKey, now, targetUserId.toString());
-                RedisUtil.zadd(followerKey, now, myId.toString());
-                log.info("用户 {} 关注了 {}", myId, targetUserId);
+        int delta = followMapper.changeFollowWithTransaction(targetUserId, myId);
+        if (delta != 0) {
+            try {
+                rebuildFollowingRedis(myId);
+                rebuildFollowerRedis(targetUserId);
+                rebuildFriendRedis(myId);
+                rebuildFriendRedis(targetUserId);
+            } catch (Exception e) {
+                log.warn("关注 Redis 重建失败，myId={}, targetUserId={}", myId, targetUserId, e);
             }
-        } else {
-            Long rows = followMapper.unFollow(targetUserId,myId);
-            if(rows>0){
-                RedisUtil.zrem(followingKey, targetUserId.toString());
-                RedisUtil.zrem(followerKey, myId.toString());
+            if (delta > 0) {
+                log.info("用户 {} 关注了 {}", myId, targetUserId);
+            } else {
                 log.info("用户 {} 取消关注了 {}", myId, targetUserId);
             }
         }
@@ -121,8 +118,103 @@ public class FollowServiceImpl implements FollowService {
     @Override
     public Boolean isFollow(Long idA) {
         Long myId = UserHolder.getUser().getId();
-        Double IFollowsA = RedisUtil.zscore("user:followers:" + idA, myId.toString());
-        return IFollowsA != null;
+        String key = followingKey(myId);
+        if (!RedisUtil.exists(key)) {
+            rebuildFollowingRedis(myId);
+        }
+        Double score = RedisUtil.zscore(key, idA.toString());
+        return score != null;
+    }
+
+    private void hidePasswords(List<User> userList) {
+        for (User user : userList) {
+            user.setPassword(null);
+        }
+    }
+
+    private PageResult getUsersFromZSet(String key, int page, int pageSize) {
+        long start = (long) (page - 1) * pageSize;
+        long end = start + pageSize - 1;
+        Set<String> userIdSet = RedisUtil.zrevrange(key, start, end);
+        Long total = RedisUtil.zcard(key);
+        if (userIdSet == null || userIdSet.isEmpty()) {
+            return new PageResult(total == null ? 0L : total, new ArrayList<>());
+        }
+
+        List<Long> userIds = userIdSet.stream().map(Long::valueOf).collect(Collectors.toList());
+        List<User> users = userMapper.getByIds(userIds);
+        hidePasswords(users);
+        Map<Long, User> userMap = new LinkedHashMap<>();
+        for (User user : users) {
+            userMap.put(user.getId(), user);
+        }
+
+        List<User> orderedUsers = new ArrayList<>();
+        for (Long userId : userIds) {
+            User user = userMap.get(userId);
+            if (user != null) {
+                orderedUsers.add(user);
+            }
+        }
+        return new PageResult(total == null ? 0L : total, orderedUsers);
+    }
+
+    //重建缓存
+    private void rebuildFollowingRedis(Long userId) {
+        RedisUtil.del(followingKey(userId));
+        List<UserFollow> relations = followMapper.findFollowingRelations(userId);
+        String key = followingKey(userId);
+        int index = 0;
+        for (UserFollow relation : relations) {
+            RedisUtil.zadd(key, followScore(relation, index), relation.getFollowingId().toString());
+            index++;
+        }
+    }
+
+    //重建缓存
+    private void rebuildFollowerRedis(Long userId) {
+        RedisUtil.del(followerKey(userId));
+        List<UserFollow> relations = followMapper.findFollowerRelations(userId);
+        String key = followerKey(userId);
+        int index = 0;
+        for (UserFollow relation : relations) {
+            RedisUtil.zadd(key, followScore(relation, index), relation.getFollowerId().toString());
+            index++;
+        }
+    }
+
+    //重建缓存
+    private void rebuildFriendRedis(Long userId) {
+        RedisUtil.del(friendKey(userId));
+        List<UserFollow> relations = followMapper.findFriendRelations(userId);
+        String key = friendKey(userId);
+        int index = 0;
+        for (UserFollow relation : relations) {
+            RedisUtil.zadd(key, followScore(relation, index), relation.getFollowingId().toString());
+            index++;
+        }
+    }
+
+    private double followScore(UserFollow relation, int index) {
+        if (relation.getCreateTime() != null) {
+            return relation.getCreateTime()
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli();
+        }
+        return System.currentTimeMillis() - index;
+    }
+
+    private String followingKey(Long userId) {
+        return FOLLOWING_PREFIX + userId;
+    }
+
+    private String followerKey(Long userId) {
+        return FOLLOWER_PREFIX + userId;
+    }
+
+    private String friendKey(Long userId) {
+        return FRIEND_PREFIX + userId;
     }
 
 }

@@ -3,6 +3,12 @@ package com.video.utils;
 import com.video.config.RedisConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 @Slf4j
 public class RedisUtil {
@@ -39,6 +45,66 @@ public class RedisUtil {
         } catch (Exception e) {
             log.error("Redis get 操作失败", e);
             return null;
+        }
+    }
+
+    public static boolean exists(String key) {
+        try (Jedis jedis = getJedis()) {
+            return jedis.exists(key);
+        } catch (Exception e) {
+            log.error("Redis exists 操作失败", e);
+            return false;
+        }
+    }
+
+    public static Long incr(String key) {
+        try (Jedis jedis = getJedis()) {
+            return jedis.incr(key);
+        } catch (Exception e) {
+            log.error("Redis incr 操作失败", e);
+            return null;
+        }
+    }
+
+    public static Long incrBy(String key, long increment) {
+        try (Jedis jedis = getJedis()) {
+            return jedis.incrBy(key, increment);
+        } catch (Exception e) {
+            log.error("Redis incrBy 操作失败", e);
+            return null;
+        }
+    }
+
+    public static List<String> scanKeys(String pattern) {
+        List<String> keys = new ArrayList<>();
+        try (Jedis jedis = getJedis()) {
+            String cursor = ScanParams.SCAN_POINTER_START;
+            ScanParams params = new ScanParams().match(pattern).count(100);
+            do {
+                ScanResult<String> scanResult = jedis.scan(cursor, params);
+                keys.addAll(scanResult.getResult());
+                cursor = scanResult.getCursor();
+            } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
+            return keys;
+        } catch (Exception e) {
+            log.error("Redis scan 操作失败", e);
+            return Collections.emptyList();
+        }
+    }
+
+    public static Long evalLong(String script, List<String> keys) {
+        try (Jedis jedis = getJedis()) {
+            Object result = jedis.eval(script, keys, Collections.emptyList());
+            if (result == null) {
+                return 0L;
+            }
+            if (result instanceof Number) {
+                return ((Number) result).longValue();
+            }
+            return Long.parseLong(result.toString());
+        } catch (Exception e) {
+            log.error("Redis eval 操作失败", e);
+            return 0L;
         }
     }
 

@@ -2,6 +2,7 @@ package com.video.mapper;
 
 
 import com.video.pojo.entity.User;
+import com.video.pojo.entity.UserFollow;
 import java.util.List;
 
 public interface FollowMapper {
@@ -17,8 +18,13 @@ public interface FollowMapper {
 
     Long follow(Long followingId, Long followerId);
     Long unFollow(Long followingId, Long followerId);
+    int changeFollowWithTransaction(Long followingId, Long followerId);
 
     Long countFollowings(Long userId);
     Long countFollowers(Long userId);
     Long countFriends(Long userId);
+
+    List<UserFollow> findFollowingRelations(Long userId);
+    List<UserFollow> findFollowerRelations(Long userId);
+    List<UserFollow> findFriendRelations(Long userId);
 }

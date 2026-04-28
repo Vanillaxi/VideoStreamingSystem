@@ -3,9 +3,33 @@
 
     <!--新增评论-->
     <insert id="insert">
-        INSERT INTO comments (video_id, user_id, content, create_time)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO comments
+        (video_id, user_id, parent_id, root_id, reply_to_user_id, content, create_time, deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
     </insert>
+
+    <update id="updateRootId">
+        UPDATE comments SET root_id = ? WHERE id = ?
+    </update>
+
+    <select id="findParentForUpdate" resultType="com.video.pojo.entity.Comment">
+        SELECT
+        id,
+        video_id AS videoId,
+        user_id AS userId,
+        parent_id AS parentId,
+        root_id AS rootId,
+        reply_to_user_id AS replyToUserId,
+        content,
+        create_time AS createTime,
+        like_count AS likesCount,
+        reply_count AS replyCount,
+        hot_score AS hotScore,
+        deleted
+        FROM comments
+        WHERE id = ? AND deleted = 0
+        FOR UPDATE
+    </select>
 
     <!--根据id查询评论-->
     <select id="findByCommentId" resultType="com.video.pojo.entity.Comment">
@@ -13,9 +37,17 @@
         c.id,
         c.video_id AS videoId,
         c.user_id AS userId,
+        c.parent_id AS parentId,
+        c.root_id AS rootId,
+        c.reply_to_user_id AS replyToUserId,
         c.content,
         c.create_time AS createTime,
-        u.username AS username
+        c.like_count AS likesCount,
+        c.reply_count AS replyCount,
+        c.hot_score AS hotScore,
+        c.deleted,
+        u.username AS username,
+        u.nickname AS nickname
         FROM comments c
         LEFT JOIN user u ON c.user_id = u.id
         WHERE c.id = ?
@@ -23,14 +55,32 @@
     </select>
 
     <!--删除评论-->
-    <delete id="delete">
-        DELETE FROM comments WHERE id = ?
-    </delete>
+    <update id="delete">
+        UPDATE comments SET deleted = 1 WHERE id = ?
+    </update>
 
     <!--更改点赞-->
     <update id="updateLikesCount">
         UPDATE comments
-        SET likes_count = likes_count + ?
+        SET like_count = GREATEST(like_count + ?, 0),
+        hot_score = like_count * 3 + reply_count * 5
+                    + GREATEST(0, 100 - TIMESTAMPDIFF(HOUR, create_time, NOW()))
+        WHERE id = ?
+    </update>
+
+    <update id="updateReplyCount">
+        UPDATE comments
+        SET reply_count = reply_count + 1,
+        hot_score = like_count * 3 + reply_count * 5
+                    + GREATEST(0, 100 - TIMESTAMPDIFF(HOUR, create_time, NOW()))
+        WHERE id = ?
+    </update>
+
+    <update id="updateVideoCommentCount">
+        UPDATE videos
+        SET comment_count = comment_count + 1,
+        hot_score = like_count * 3 + comment_count * 5 + favorite_count * 4 + view_count
+                    + GREATEST(0, 100 - TIMESTAMPDIFF(HOUR, create_time, NOW()))
         WHERE id = ?
     </update>
 
@@ -39,7 +89,7 @@
     <select id="countByVideoId" resultType="java.lang.Long">
         SELECT COUNT(*)
         FROM comments
-        WHERE video_id = ?
+        WHERE video_id = ? AND parent_id IS NULL
     </select>
 
     <select id="findPageByVideoId" resultType="com.video.pojo.entity.Comment">
@@ -47,15 +97,76 @@
         c.id,
         c.video_id AS videoId,
         c.user_id AS userId,
+        c.parent_id AS parentId,
+        c.root_id AS rootId,
+        c.reply_to_user_id AS replyToUserId,
         c.content,
         c.create_time AS createTime,
-        c.likes_count AS likesCount,
-        u.nickname AS nickname
+        c.like_count AS likesCount,
+        c.reply_count AS replyCount,
+        c.hot_score AS hotScore,
+        c.deleted,
+        u.username AS username,
+        u.nickname AS nickname,
+        ru.username AS replyToUsername,
+        ru.nickname AS replyToNickname
         FROM comments c
         LEFT JOIN user u ON c.user_id = u.id
-        WHERE c.video_id = ?
+        LEFT JOIN user ru ON c.reply_to_user_id = ru.id
+        WHERE c.video_id = ? AND c.parent_id IS NULL
         ORDER BY c.create_time DESC
         LIMIT ?, ?
+    </select>
+
+    <select id="findPageByVideoIdHot" resultType="com.video.pojo.entity.Comment">
+        SELECT
+        c.id,
+        c.video_id AS videoId,
+        c.user_id AS userId,
+        c.parent_id AS parentId,
+        c.root_id AS rootId,
+        c.reply_to_user_id AS replyToUserId,
+        c.content,
+        c.create_time AS createTime,
+        c.like_count AS likesCount,
+        c.reply_count AS replyCount,
+        c.hot_score AS hotScore,
+        c.deleted,
+        u.username AS username,
+        u.nickname AS nickname,
+        ru.username AS replyToUsername,
+        ru.nickname AS replyToNickname
+        FROM comments c
+        LEFT JOIN user u ON c.user_id = u.id
+        LEFT JOIN user ru ON c.reply_to_user_id = ru.id
+        WHERE c.video_id = ? AND c.parent_id IS NULL
+        ORDER BY c.hot_score DESC, c.create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="findRepliesByRootIds" resultType="com.video.pojo.entity.Comment">
+        SELECT
+        c.id,
+        c.video_id AS videoId,
+        c.user_id AS userId,
+        c.parent_id AS parentId,
+        c.root_id AS rootId,
+        c.reply_to_user_id AS replyToUserId,
+        c.content,
+        c.create_time AS createTime,
+        c.like_count AS likesCount,
+        c.reply_count AS replyCount,
+        c.hot_score AS hotScore,
+        c.deleted,
+        u.username AS username,
+        u.nickname AS nickname,
+        ru.username AS replyToUsername,
+        ru.nickname AS replyToNickname
+        FROM comments c
+        LEFT JOIN user u ON c.user_id = u.id
+        LEFT JOIN user ru ON c.reply_to_user_id = ru.id
+        WHERE c.root_id IN (%s) AND c.parent_id IS NOT NULL
+        ORDER BY c.create_time ASC
     </select>
 
 </mapper>

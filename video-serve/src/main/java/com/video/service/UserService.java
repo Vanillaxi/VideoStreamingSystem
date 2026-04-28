@@ -1,6 +1,9 @@
 package com.video.service;
 
 import com.video.pojo.entity.User;
+import jakarta.servlet.http.Part;
+
+import java.io.IOException;
 
 public interface UserService {
     // 注册
@@ -14,6 +17,9 @@ public interface UserService {
 
     //修改信息
     void updateUserInfo(User user);
+
+    //上传或修改头像
+    void updateAvatar(Part file) throws IOException;
 
     //注销账号
     void deleteMe();

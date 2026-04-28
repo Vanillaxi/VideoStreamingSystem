@@ -11,6 +11,7 @@ public class MessageConstant {
     public static final String VIDEO_NOT_FOUND = "视频不存在";
     public static final String COMMENT_NOT_FOUND = "评论不存在";
     public static final String NOT_ALLOW_DELETE = "不允许删除别人的评论";
+    public static final String PARENT_COMMENT_NOT_FOUND = "父评论不存在或已删除";
 
     public static final String NOT_ALLOW_FOLLOW = "不允许关注自己";
 }

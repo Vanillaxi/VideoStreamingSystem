@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.CategoryMapper">
+
+    <select id="listEnabled" resultType="com.video.pojo.entity.Category">
+        SELECT
+        id,
+        name,
+        description,
+        sort,
+        status,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM category
+        WHERE status = 1
+        ORDER BY sort ASC, id ASC
+    </select>
+
+    <select id="getById" resultType="com.video.pojo.entity.Category">
+        SELECT
+        id,
+        name,
+        description,
+        sort,
+        status,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM category
+        WHERE id = ?
+    </select>
+
+</mapper>

@@ -3,17 +3,48 @@
 
     <!--根据名字查询用户-->
     <select id="getByUsername" resultType="com.video.pojo.entity.User">
-        SELECT id, username, password, role,nickname FROM user WHERE username = ?
+        SELECT
+        id,
+        username,
+        password,
+        role,
+        nickname,
+        avatar_url AS avatarUrl,
+        avatar_object_key AS avatarObjectKey
+        FROM user
+        WHERE username = ?
     </select>
 
     <!--根据id查询用户-->
     <select id="getByUserId" resultType="com.video.pojo.entity.User">
-        SELECT id, username, password, role,nickname FROM user WHERE id = ?
+        SELECT
+        id,
+        username,
+        password,
+        role,
+        nickname,
+        avatar_url AS avatarUrl,
+        avatar_object_key AS avatarObjectKey
+        FROM user
+        WHERE id = ?
+    </select>
+
+    <select id="getByIds" resultType="com.video.pojo.entity.User">
+        SELECT
+        id,
+        username,
+        role,
+        nickname,
+        avatar_url AS avatarUrl,
+        avatar_object_key AS avatarObjectKey
+        FROM user
+        WHERE id IN (%s)
     </select>
 
     <!--添加用户-->
     <insert id="insert">
-        INSERT INTO user (username, password, role,nickname,create_user,update_user) VALUES (?, ?, ?,?,?,?)
+        INSERT INTO user (username, password, role, nickname, avatar_url, avatar_object_key, create_user, update_user)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     </insert>
 
     <!--修改用户信息-->
@@ -22,6 +53,8 @@
         SET username=?,
         password = ?,
         nickname = ?,
+        avatar_url = ?,
+        avatar_object_key = ?,
         role=?,
         update_user=?
         WHERE id = ?

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.FavoriteMapper">
+
+    <insert id="insertFavorite">
+        INSERT IGNORE INTO video_favorite (video_id, user_id, create_time)
+        VALUES (?, ?, NOW())
+    </insert>
+
+    <delete id="deleteFavorite">
+        DELETE FROM video_favorite
+        WHERE video_id = ? AND user_id = ?
+    </delete>
+
+    <select id="existsFavorite" resultType="java.lang.Boolean">
+        SELECT 1
+        FROM video_favorite
+        WHERE video_id = ? AND user_id = ?
+        LIMIT 1
+    </select>
+
+    <select id="findByUserId" resultType="com.video.pojo.entity.VideoFavorite">
+        SELECT
+        id,
+        user_id AS userId,
+        video_id AS videoId,
+        create_time AS createTime
+        FROM video_favorite
+        WHERE user_id = ?
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="countByUserId" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM video_favorite
+        WHERE user_id = ?
+    </select>
+
+</mapper>

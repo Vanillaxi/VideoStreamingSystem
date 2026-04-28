@@ -11,9 +11,12 @@ import java.time.LocalDateTime;
 public class User {
     private Long id;
     private String username;
+    @JSONField(serialize = false)
     private String password; // 存储加密后的哈希值
     private Integer role;    // 0:普通用户, 1:会员，2：普通管理员，3：Vanilla_xi
     private String nickname;
+    private String avatarUrl;
+    private String avatarObjectKey;
 
     private String creatUser;
     private String updateUser;

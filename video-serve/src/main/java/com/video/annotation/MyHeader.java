@@ -10,5 +10,5 @@ import java.lang.annotation.Target;
 @Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface MyHeader {
-    String value(); // Header 的名称，如 "token"
+    String value(); // Header 的名称，如 "Authorization"
 }

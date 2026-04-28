@@ -2,9 +2,15 @@ package com.video.mapper.impl;
 
 
 import com.video.annotation.MyComponent;
+import com.video.config.DBPool;
+import com.video.exception.BaseException;
 import com.video.pojo.entity.User;
+import com.video.pojo.entity.UserFollow;
 import com.video.mapper.FollowMapper;
 import com.video.utils.XmlSqlReaderUtil;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.List;
 import static com.video.utils.JdbcUtils.*;
 
@@ -59,6 +65,51 @@ public class FollowMapperImpl implements FollowMapper {
         return (long) executeUpdate( sql,followingId,followerId);
     }
 
+    @Override
+    public int changeFollowWithTransaction(Long followingId, Long followerId) {
+        String existsSql = XmlSqlReaderUtil.getSql("com.video.mapper.FollowMapper.isFollow");
+        String followSql = XmlSqlReaderUtil.getSql("com.video.mapper.FollowMapper.follow");
+        String unFollowSql = XmlSqlReaderUtil.getSql("com.video.mapper.FollowMapper.unFollow");
+        Connection conn = DBPool.getConnection();
+        try {
+            conn.setAutoCommit(false);
+            boolean exists;
+            try (PreparedStatement pstmt = conn.prepareStatement(existsSql)) {
+                pstmt.setLong(1, followingId);
+                pstmt.setLong(2, followerId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    exists = rs.next();
+                }
+            }
+
+            int rows;
+            int delta;
+            if (exists) {
+                try (PreparedStatement pstmt = conn.prepareStatement(unFollowSql)) {
+                    pstmt.setLong(1, followingId);
+                    pstmt.setLong(2, followerId);
+                    rows = pstmt.executeUpdate();
+                }
+                delta = rows > 0 ? -1 : 0;
+            } else {
+                try (PreparedStatement pstmt = conn.prepareStatement(followSql)) {
+                    pstmt.setLong(1, followingId);
+                    pstmt.setLong(2, followerId);
+                    rows = pstmt.executeUpdate();
+                }
+                delta = rows > 0 ? 1 : 0;
+            }
+            conn.commit();
+            return delta;
+        } catch (Exception e) {
+            rollback(conn);
+            throw new BaseException("关注操作失败");
+        } finally {
+            resetAutoCommit(conn);
+            DBPool.releaseConnection(conn);
+        }
+    }
+
 
     @Override
     public Long countFollowings(Long userId) {
@@ -76,6 +127,38 @@ public class FollowMapperImpl implements FollowMapper {
     public Long countFriends(Long userId) {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.FollowMapper.countFriends");
         return executeQueryCount( sql, userId);
+    }
+
+    @Override
+    public List<UserFollow> findFollowingRelations(Long userId) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.FollowMapper.findFollowingRelations");
+        return executeQuery(UserFollow.class, sql, userId);
+    }
+
+    @Override
+    public List<UserFollow> findFollowerRelations(Long userId) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.FollowMapper.findFollowerRelations");
+        return executeQuery(UserFollow.class, sql, userId);
+    }
+
+    @Override
+    public List<UserFollow> findFriendRelations(Long userId) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.FollowMapper.findFriendRelations");
+        return executeQuery(UserFollow.class, sql, userId);
+    }
+
+    private void rollback(Connection conn) {
+        try {
+            conn.rollback();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void resetAutoCommit(Connection conn) {
+        try {
+            conn.setAutoCommit(true);
+        } catch (Exception ignored) {
+        }
     }
 
 }

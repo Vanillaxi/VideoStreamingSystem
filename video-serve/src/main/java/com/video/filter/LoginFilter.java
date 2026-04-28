@@ -1,14 +1,20 @@
 package com.video.filter;
 
 import com.video.pojo.entity.User;
+import com.video.utils.AuthHeaderUtil;
 import com.video.utils.JSONUtil;
-import com.video.utils.RedisUtil; // 确保导入的是 RedisUtil
+import com.video.utils.RedisUtil;
 import com.video.utils.UserHolder;
-import jakarta.servlet.*;
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
 
 @Slf4j
@@ -22,42 +28,37 @@ public class LoginFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
 
-        // 获取 Token
-        String token = req.getHeader("token");
-
-        if (token != null && !token.isEmpty()) {
-            String key = "login:token:" + token;
-            String userJson = RedisUtil.get(key);
-
-            if (userJson != null) {
-                // 刷新有效期
-                RedisUtil.expire(key, 1800);
-
-                //  保存到 ThreadLocal 供后续 Service 使用
-                User user = JSONUtil.toBean(userJson, User.class);
-                UserHolder.saveUser(user);
-            }
-        }
-
-        // 拿完整路径
-        String path = req.getRequestURI();
-        log.info("Filter正在校验路径: {}", path);
-
-        // 放行
-        if (path.contains("/login") || path.contains("/register")) {
-            log.info("放行: {}", path);
-            chain.doFilter(request, response);
-            return;
-        }
-        // 校验是否登录成功（ThreadLocal 中是否有值）
-        if (UserHolder.getUser() == null) {
-            log.warn("拦截到未登录请求: {}", path);
-            resp.setStatus(401);
-            resp.getWriter().write("Please login first");
-            return;
-        }
-
         try {
+            String token = AuthHeaderUtil.extractBearerToken(req.getHeader("Authorization"));
+
+            if (token != null && !token.isEmpty()) {
+                String key = "login:token:" + token;
+                String userJson = RedisUtil.get(key);
+
+                if (userJson != null) {
+                    RedisUtil.expire(key, 3600);
+                    User user = JSONUtil.toBean(userJson, User.class);
+                    UserHolder.saveUser(user);
+                }
+
+            }
+
+            String path = req.getRequestURI();
+            log.info("Filter正在校验路径: {}", path);
+
+            if (path.contains("/login") || path.contains("/register")) {
+                log.info("放行: {}", path);
+                chain.doFilter(request, response);
+                return;
+            }
+
+            if (UserHolder.getUser() == null) {
+                log.warn("拦截到未登录请求: {}", path);
+                resp.setStatus(401);
+                resp.getWriter().write("Please login first");
+                return;
+            }
+
             chain.doFilter(request, response);
         } finally {
             UserHolder.removeUser();

@@ -13,11 +13,22 @@ import java.time.LocalDateTime;
 public class Video {
     private Long id;
     private String title;
-    private String url; // 视频播放路径
+    private String description;
+    private Long categoryId;
     private Long userId;//博主Id
+    private String videoUrl; // OSS 视频播放地址
+    private String objectKey; // OSS 对象 key，用于删除文件
+    private Long size;
+    private String status;
     private Long likesCount;
+    private Long commentCount;
+    private Long favoriteCount;
+    private Long viewCount;
+    private Double hotScore;
 
     @JSONField(format = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
+    @JSONField(format = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime updateTime;
 
 }

@@ -16,8 +16,9 @@ public interface CommentMapper {
 
 
     //根据videoId分页查询
-    List<Comment> findPageByVideoId(Long videoId,int offset, int pageSize);
+    List<Comment> findPageByVideoId(Long videoId,int offset, int pageSize, String sort);
     Long countByVideoId(Long videoId);
+    List<Comment> findRepliesByRootIds(List<Long> rootIds);
 
     void updateLikesCount(Long commentId, int i);
 }

@@ -10,11 +10,15 @@ import com.video.pojo.entity.User;
 import com.video.mapper.UserMapper;
 import com.video.service.UserService;
 import com.video.utils.JWTUtil;
+import com.video.utils.OssClientUtil;
 import com.video.utils.PasswordUtil;
 import com.video.utils.RedisUtil;
 import com.alibaba.fastjson.JSON;
 import com.video.utils.UserHolder;
+import jakarta.servlet.http.Part;
 import lombok.extern.slf4j.Slf4j;
+
+import java.io.IOException;
 
 @Slf4j
 @MyComponent
@@ -54,9 +58,10 @@ public class UserServiceImpl implements UserService {
         String token = JWTUtil.generate(user.getId(), user.getUsername(), user.getRole());
 
         // 存入 Redis
+        user.setPassword(null);
         String userJson = JSON.toJSONString(user);
         String redisKey = "login:token:" + token;
-        RedisUtil.set(redisKey, userJson, 1800);
+        RedisUtil.set(redisKey, userJson, 3600);
 
         return token;
     }
@@ -81,10 +86,46 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public void updateUserInfo(User user) {
-        User userDto=UserHolder.getUser();
+        User currentUser = UserHolder.getUser();
+        User userDto = userMapper.getByUserId(currentUser.getId());
+        if (userDto == null) {
+            throw new AccountNotFoundException();
+        }
+        
         if (user.getNickname()!=null) {userDto.setNickname(user.getNickname());}
         if (user.getPassword()!=null) {userDto.setPassword(PasswordUtil.hashPassword(user.getPassword()));}
+        userDto.setUpdateUser(userDto.getUsername());
         userMapper.update(userDto);
+    }
+
+    /**
+     * 换头像
+     * @param file
+     * @throws IOException
+     */
+    @Override
+    public void updateAvatar(Part file) throws IOException {
+        User currentUser = UserHolder.getUser();
+        User user = userMapper.getByUserId(currentUser.getId());
+        if (user == null) {
+            throw new AccountNotFoundException();
+        }
+
+        String oldObjectKey = user.getAvatarObjectKey();
+        OssClientUtil ossClientUtil = new OssClientUtil();
+        OssClientUtil.UploadedObject uploadedObject = ossClientUtil.uploadAvatar(file);
+        user.setAvatarUrl(uploadedObject.getUrl());
+        user.setAvatarObjectKey(uploadedObject.getObjectKey());
+        user.setUpdateUser(user.getUsername());
+        userMapper.update(user);
+
+        if (oldObjectKey != null && !oldObjectKey.isBlank()) {
+            try {
+                ossClientUtil.deleteObject(oldObjectKey);
+            } catch (IOException e) {
+                log.warn("旧头像 OSS 文件删除失败: {}", oldObjectKey, e);
+            }
+        }
     }
 
     /**
@@ -143,6 +184,7 @@ public class UserServiceImpl implements UserService {
         if(user==null){
             throw new AccountNotFoundException();
         }
+        user.setPassword(null);
         return user;
     }
 

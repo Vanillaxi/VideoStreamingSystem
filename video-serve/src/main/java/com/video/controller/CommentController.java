@@ -19,8 +19,8 @@ public class CommentController extends BaseController {
      * @return
      */
     @MyMapping(value="/list",method = "GET")
-    public Result getCommentsByVideoId(Long videoId, int page, int pageSize){
-        PageResult comments = commentService.getCommentsByVideoId(videoId,page,pageSize);
+    public Result getCommentsByVideoId(Long videoId, int page, int pageSize, String sort){
+        PageResult comments = commentService.getCommentsByVideoId(videoId,page,pageSize,sort);
         return Result.success(comments);
     }
 
@@ -31,8 +31,8 @@ public class CommentController extends BaseController {
      * @return
      */
     @MyMapping(value="/add",method = "POST")
-    public Result addComments(Long videoId,String content){
-        commentService.addComment(videoId, content);
+    public Result addComments(Long videoId, Long parentId, String content){
+        commentService.addComment(videoId, parentId, content);
         return Result.success("发表成功");
     }
 

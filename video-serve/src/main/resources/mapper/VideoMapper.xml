@@ -6,21 +6,66 @@
         SELECT
         id,
         title,
-        url,
+        description,
+        category_id AS categoryId,
         user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
         create_time AS createTime,
-        likes_count AS likesCount
+        update_time AS updateTime
         FROM videos
         WHERE id = ?
     </select>
 
     <insert id="postVideo" parameterType="com.video.pojo.entity.Video">
-        INSERT INTO videos (title,url, user_id,likes_count, create_time)
-        VALUES (?, ?, ?, ?,?)
+        INSERT INTO videos
+        (title, description, category_id, user_id, video_url, object_key, size, status, like_count, comment_count, favorite_count, view_count, hot_score, create_time, update_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     </insert>
+
+    <select id="getByIds" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        WHERE id IN (%s)
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM videos WHERE id = ?
+    </delete>
+
     <insert id="insertLikes">
-        INSERT INTO video_like (video_id, user_id) VALUES (?, ?)
+        INSERT IGNORE INTO video_like (video_id, user_id) VALUES (?, ?)
     </insert>
+
+    <select id="existsLike" resultType="java.lang.Boolean">
+        SELECT 1
+        FROM video_like
+        WHERE video_id = ? AND user_id = ?
+        LIMIT 1
+    </select>
 
     <delete id="deleteLikes">
         DELETE FROM video_like WHERE video_id = ? AND user_id = ?
@@ -28,8 +73,34 @@
 
     <update id="updateLikes">
         UPDATE videos
-        SET likes_count=likes_count+?
+        SET like_count = GREATEST(like_count + ?, 0),
+        hot_score = like_count * 3 + comment_count * 5 + favorite_count * 4 + view_count
+                    + GREATEST(0, 100 - TIMESTAMPDIFF(HOUR, create_time, NOW()))
         WHERE id =?
+    </update>
+
+    <update id="updateCommentCount">
+        UPDATE videos
+        SET comment_count = GREATEST(comment_count + ?, 0),
+        hot_score = like_count * 3 + comment_count * 5 + favorite_count * 4 + view_count
+                    + GREATEST(0, 100 - TIMESTAMPDIFF(HOUR, create_time, NOW()))
+        WHERE id =?
+    </update>
+
+    <update id="updateFavoriteCount">
+        UPDATE videos
+        SET favorite_count = GREATEST(favorite_count + ?, 0),
+        hot_score = like_count * 3 + comment_count * 5 + favorite_count * 4 + view_count
+                    + GREATEST(0, 100 - TIMESTAMPDIFF(HOUR, create_time, NOW()))
+        WHERE id = ?
+    </update>
+
+    <update id="incrementViewCount">
+        UPDATE videos
+        SET view_count = view_count + ?,
+        hot_score = like_count * 3 + comment_count * 5 + favorite_count * 4 + view_count
+                    + GREATEST(0, 100 - TIMESTAMPDIFF(HOUR, create_time, NOW()))
+        WHERE id = ?
     </update>
 
 
@@ -42,10 +113,153 @@
 
     <select id="getVideoPageByTitle" resultType="com.video.pojo.entity.Video">
         SELECT
-        id, title, url,
-        create_time, likes_count, user_id
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
         FROM videos
         WHERE title LIKE ?
+        ORDER BY create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="getVideoPageByTitleHot" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        WHERE title LIKE ?
+        ORDER BY hot_score DESC, create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="getVideoCountByCategoryId" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM videos
+        WHERE category_id = ?
+    </select>
+
+    <select id="getVideoCount" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM videos
+    </select>
+
+    <select id="getVideoPageByCategoryId" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        WHERE category_id = ?
+        ORDER BY create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="getVideoPageByCategoryIdHot" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        WHERE category_id = ?
+        ORDER BY hot_score DESC, create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="getHotTop50" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        ORDER BY hot_score DESC, create_time DESC
+        LIMIT 50
+    </select>
+
+    <select id="getNewestPage" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
         ORDER BY create_time DESC
         LIMIT ?, ?
     </select>

@@ -10,6 +10,7 @@ import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
+//全局异常处理器
 @WebFilter("/*")
 public class GlobalExceptionFilter implements Filter {
     @Override
