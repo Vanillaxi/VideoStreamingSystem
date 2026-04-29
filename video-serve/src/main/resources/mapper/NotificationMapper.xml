@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.NotificationMapper">
+
+    <insert id="insert">
+        INSERT INTO notification
+        (user_id, type, content, related_id, is_read, create_time)
+        VALUES (?, ?, ?, ?, ?, ?)
+    </insert>
+
+</mapper>

@@ -1,6 +1,7 @@
 package com.video.mapper;
 
 import com.video.pojo.entity.Video;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface VideoMapper {
@@ -24,6 +25,8 @@ public interface VideoMapper {
     List<Video> getVideoPageByCategoryId(Long categoryId, int offset, int pageSize, String sort);
     Long getVideoCountByCategoryId(Long categoryId);
     List<Video> getHotTop50();
+    List<Video> getHotCursorPage(Double cursorHotScore, LocalDateTime cursorCreateTime, Long cursorId, int limit);
+    List<Video> getTimeCursorPage(LocalDateTime cursorCreateTime, Long cursorId, int limit);
     List<Video> getNewestPage(int offset, int pageSize);
     Long getVideoCount();
 

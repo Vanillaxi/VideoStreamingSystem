@@ -25,6 +25,16 @@ public class CommentController extends BaseController {
     }
 
     /**
+     * 评论游标分页。sort=time/hot；第一页不传游标，后续传上一页返回的游标。
+     */
+    @MyMapping(value="/list/cursor",method = "GET")
+    public Result getCommentsByVideoIdCursor(Long videoId, String sort, Double cursorHotScore,
+                                             String cursorCreateTime, Long cursorId, Integer pageSize) {
+        return Result.success(commentService.getCommentsByVideoIdCursor(videoId, sort, cursorHotScore,
+                cursorCreateTime, cursorId, pageSize));
+    }
+
+    /**
      * 发布评论
      * @param videoId
      * @param content

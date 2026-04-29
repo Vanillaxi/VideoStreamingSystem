@@ -16,6 +16,7 @@ import java.util.Enumeration;
 
 /**
  * 项目启动监听器：替代 Spring 的启动类功能
+ * 定时任务启动位置
  */
 @Slf4j
 @WebListener
@@ -40,7 +41,7 @@ public class ContextLoaderListener implements ServletContextListener {
 
         try {
             UserHolder.removeUser();
-            VideoViewCountFlushTask.shutdown();
+            VideoViewCountFlushTask.shutdown();//定时刷库任务启动
             BeanFactory.destroy();
             DBPool.close();
             CacheClient.shutdown();

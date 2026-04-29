@@ -41,6 +41,18 @@
         WHERE id IN (%s)
     </select>
 
+    <select id="getByUsernames" resultType="com.video.pojo.entity.User">
+        SELECT
+        id,
+        username,
+        role,
+        nickname,
+        avatar_url AS avatarUrl,
+        avatar_object_key AS avatarObjectKey
+        FROM user
+        WHERE username IN (%s)
+    </select>
+
     <!--添加用户-->
     <insert id="insert">
         INSERT INTO user (username, password, role, nickname, avatar_url, avatar_object_key, create_user, update_user)

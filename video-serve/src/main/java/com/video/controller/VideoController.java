@@ -51,6 +51,22 @@ public class VideoController extends BaseController {
     }
 
     /**
+     * 热度游标分页。第一页不传游标，后续传上一页返回的 nextHotScore、nextCreateTime、nextId。
+     */
+    @MyMapping(value = "/list/hot/cursor", method = "GET")
+    public Result getHotCursorPage(Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
+        return Result.success(videoService.getHotCursorPage(cursorHotScore, cursorCreateTime, cursorId, pageSize));
+    }
+
+    /**
+     * Feed 流游标分页。sort=time/hot；第一页不传游标，后续传上一页返回的游标。
+     */
+    @MyMapping(value = "/feed/cursor", method = "GET")
+    public Result getFeedCursorPage(String sort, Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
+        return Result.success(videoService.getFeedCursorPage(sort, cursorHotScore, cursorCreateTime, cursorId, pageSize));
+    }
+
+    /**
      * 最新视频列表
      */
     @MyMapping(value = "/list/new", method = "GET")

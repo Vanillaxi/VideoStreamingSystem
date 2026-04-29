@@ -9,6 +9,7 @@ public interface UserMapper {
     User getByUsername(String username);
     User getByUserId(Long userId);
     List<User> getByIds(List<Long> userIds);
+    List<User> getByUsernames(List<String> usernames);
 
     void update(User user); //修改信息
 

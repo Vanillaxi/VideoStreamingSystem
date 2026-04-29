@@ -5,6 +5,7 @@ import com.video.annotation.MyComponent;
 import com.video.exception.BusinessException;
 import com.video.exception.ErrorCode;
 import com.video.exception.SystemException;
+import com.video.pojo.dto.CursorPageResult;
 import com.video.pojo.dto.PageResult;
 import com.video.pojo.entity.Video;
 import com.video.pojo.entity.User;
@@ -16,6 +17,8 @@ import com.video.utils.OssClientUtil;
 import com.video.utils.RedisUtil;
 import com.video.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,6 +28,8 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @MyComponent
 public class VideoServiceImpl implements VideoService {
+    private static final int DEFAULT_CURSOR_PAGE_SIZE = 20;
+    private static final int MAX_CURSOR_PAGE_SIZE = 50;
     private static final String HOT_LIST_KEY = "video:list:hot";
     private static final String NEW_LIST_KEY = "video:list:new";
     private static final String CATEGORY_LIST_PREFIX = "video:list:category:";
@@ -181,6 +186,41 @@ public class VideoServiceImpl implements VideoService {
         return queryPageWithCache(HOT_LIST_KEY, this::getHotTop50FromDb, LIST_CACHE_TTL);
     }
 
+    @Override
+    public CursorPageResult<Video> getHotCursorPage(Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
+        return getFeedCursorPage("hot", cursorHotScore, cursorCreateTime, cursorId, pageSize);
+    }
+
+    @Override
+    public CursorPageResult<Video> getFeedCursorPage(String sort, Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
+        String normalizedSort = normalizeSort(sort);
+        int safePageSize = normalizeCursorPageSize(pageSize);
+        validateCursor(normalizedSort, cursorHotScore, cursorCreateTime, cursorId);
+        LocalDateTime cursorTime = parseCursorCreateTime(cursorCreateTime);
+
+        List<Video> videoList;
+        if ("hot".equals(normalizedSort)) {
+            videoList = videoMapper.getHotCursorPage(cursorHotScore, cursorTime, cursorId, safePageSize + 1);
+        } else {
+            videoList = videoMapper.getTimeCursorPage(cursorTime, cursorId, safePageSize + 1);
+        }
+
+        boolean hasNext = videoList.size() > safePageSize;
+        if (hasNext) {
+            videoList = new ArrayList<>(videoList.subList(0, safePageSize));
+        }
+
+        Video lastVideo = videoList.isEmpty() ? null : videoList.get(videoList.size() - 1);
+        return new CursorPageResult<>(
+                videoList,
+                hasNext,
+                lastVideo == null ? null : lastVideo.getHotScore(),
+                lastVideo == null ? null : lastVideo.getCreateTime(),
+                lastVideo == null ? null : lastVideo.getId(),
+                safePageSize
+        );
+    }
+
     /**
      * 根据时间查询视频
      * @param page
@@ -264,6 +304,53 @@ public class VideoServiceImpl implements VideoService {
         int offset = (page - 1) * pageSize;
         List<Video> videoList = videoMapper.getNewestPage(offset, pageSize);
         return new PageResult(total, videoList);
+    }
+
+    private int normalizeCursorPageSize(Integer pageSize) {
+        if (pageSize == null || pageSize <= 0) {
+            return DEFAULT_CURSOR_PAGE_SIZE;
+        }
+        return Math.min(pageSize, MAX_CURSOR_PAGE_SIZE);
+    }
+
+    private String normalizeSort(String sort) {
+        if ("hot".equalsIgnoreCase(sort)) {
+            return "hot";
+        }
+        return "time";
+    }
+
+    private void validateCursor(String sort, Double cursorHotScore, String cursorCreateTime, Long cursorId) {
+        boolean hasTime = cursorCreateTime != null && !cursorCreateTime.isBlank();
+        boolean hasAnyCursor = cursorHotScore != null
+                || hasTime
+                || cursorId != null;
+        boolean hasAllTimeCursor = hasTime && cursorId != null;
+        boolean hasAllHotCursor = cursorHotScore != null && hasTime && cursorId != null;
+        if (!hasAnyCursor) {
+            return;
+        }
+        if ("hot".equals(sort) && !hasAllHotCursor) {
+            throw new BusinessException(400, "热度游标参数不完整");
+        }
+        if ("time".equals(sort) && !hasAllTimeCursor) {
+            throw new BusinessException(400, "时间游标参数不完整");
+        }
+    }
+
+    private LocalDateTime parseCursorCreateTime(String cursorCreateTime) {
+        if (cursorCreateTime == null || cursorCreateTime.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(cursorCreateTime);
+        } catch (DateTimeParseException e) {
+            try {
+                return LocalDateTime.parse(cursorCreateTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            } catch (DateTimeParseException ex) {
+                throw new BusinessException(400, "游标时间格式错误");
+            }
+        }
     }
 
     private Video queryVideoDetailWithCache(Long videoId) {

@@ -118,6 +118,33 @@
         LIMIT ?, ?
     </select>
 
+    <select id="findCursorPageByVideoIdTime" resultType="com.video.pojo.entity.Comment">
+        SELECT
+        c.id,
+        c.video_id AS videoId,
+        c.user_id AS userId,
+        c.parent_id AS parentId,
+        c.root_id AS rootId,
+        c.reply_to_user_id AS replyToUserId,
+        c.content,
+        c.create_time AS createTime,
+        c.like_count AS likesCount,
+        c.reply_count AS replyCount,
+        c.hot_score AS hotScore,
+        c.deleted,
+        u.username AS username,
+        u.nickname AS nickname,
+        ru.username AS replyToUsername,
+        ru.nickname AS replyToNickname
+        FROM comments c
+        LEFT JOIN user u ON c.user_id = u.id
+        LEFT JOIN user ru ON c.reply_to_user_id = ru.id
+        WHERE c.video_id = ? AND c.parent_id IS NULL
+          AND (? IS NULL OR c.create_time &lt; ? OR (c.create_time = ? AND c.id &lt; ?))
+        ORDER BY c.create_time DESC, c.id DESC
+        LIMIT ?
+    </select>
+
     <select id="findPageByVideoIdHot" resultType="com.video.pojo.entity.Comment">
         SELECT
         c.id,
@@ -142,6 +169,36 @@
         WHERE c.video_id = ? AND c.parent_id IS NULL
         ORDER BY c.hot_score DESC, c.create_time DESC
         LIMIT ?, ?
+    </select>
+
+    <select id="findCursorPageByVideoIdHot" resultType="com.video.pojo.entity.Comment">
+        SELECT
+        c.id,
+        c.video_id AS videoId,
+        c.user_id AS userId,
+        c.parent_id AS parentId,
+        c.root_id AS rootId,
+        c.reply_to_user_id AS replyToUserId,
+        c.content,
+        c.create_time AS createTime,
+        c.like_count AS likesCount,
+        c.reply_count AS replyCount,
+        c.hot_score AS hotScore,
+        c.deleted,
+        u.username AS username,
+        u.nickname AS nickname,
+        ru.username AS replyToUsername,
+        ru.nickname AS replyToNickname
+        FROM comments c
+        LEFT JOIN user u ON c.user_id = u.id
+        LEFT JOIN user ru ON c.reply_to_user_id = ru.id
+        WHERE c.video_id = ? AND c.parent_id IS NULL
+          AND (? IS NULL
+           OR c.hot_score &lt; ?
+           OR (c.hot_score = ? AND c.create_time &lt; ?)
+           OR (c.hot_score = ? AND c.create_time = ? AND c.id &lt; ?))
+        ORDER BY c.hot_score DESC, c.create_time DESC, c.id DESC
+        LIMIT ?
     </select>
 
     <select id="findRepliesByRootIds" resultType="com.video.pojo.entity.Comment">

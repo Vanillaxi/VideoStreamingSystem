@@ -1,6 +1,7 @@
 package com.video.service;
 
 import com.video.pojo.dto.PageResult;
+import com.video.pojo.dto.CursorPageResult;
 import com.video.pojo.entity.Video;
 
 
@@ -16,6 +17,9 @@ public interface VideoService {
     void flushViewCountToDb();
 
     PageResult getHotTop50();
+
+    CursorPageResult<Video> getHotCursorPage(Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize);
+    CursorPageResult<Video> getFeedCursorPage(String sort, Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize);
 
     PageResult getNewestVideos(int page, int pageSize);
 

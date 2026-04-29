@@ -17,6 +17,8 @@ public interface CommentMapper {
 
     //根据videoId分页查询
     List<Comment> findPageByVideoId(Long videoId,int offset, int pageSize, String sort);
+    List<Comment> findCursorPageByVideoIdTime(Long videoId, java.time.LocalDateTime cursorCreateTime, Long cursorId, int limit);
+    List<Comment> findCursorPageByVideoIdHot(Long videoId, Double cursorHotScore, java.time.LocalDateTime cursorCreateTime, Long cursorId, int limit);
     Long countByVideoId(Long videoId);
     List<Comment> findRepliesByRootIds(List<Long> rootIds);
 

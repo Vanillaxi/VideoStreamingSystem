@@ -19,6 +19,8 @@ public class XmlSqlReaderUtil {
         loadSql("mapper/FollowMapper.xml");
         loadSql("mapper/FavoriteMapper.xml");
         loadSql("mapper/CategoryMapper.xml");
+        loadSql("mapper/CommentMentionMapper.xml");
+        loadSql("mapper/NotificationMapper.xml");
     }
 
     private static void loadSql(String path) {

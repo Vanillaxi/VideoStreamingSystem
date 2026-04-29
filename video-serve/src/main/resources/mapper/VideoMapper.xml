@@ -241,6 +241,57 @@
         LIMIT 50
     </select>
 
+    <select id="getHotCursorPage" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        WHERE (? IS NULL
+           OR hot_score &lt; ?
+           OR (hot_score = ? AND create_time &lt; ?)
+           OR (hot_score = ? AND create_time = ? AND id &lt; ?))
+        ORDER BY hot_score DESC, create_time DESC, id DESC
+        LIMIT ?
+    </select>
+
+    <select id="getTimeCursorPage" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        WHERE (? IS NULL OR create_time &lt; ? OR (create_time = ? AND id &lt; ?))
+        ORDER BY create_time DESC, id DESC
+        LIMIT ?
+    </select>
+
     <select id="getNewestPage" resultType="com.video.pojo.entity.Video">
         SELECT
         id,

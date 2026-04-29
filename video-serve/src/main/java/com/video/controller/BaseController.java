@@ -188,7 +188,9 @@ public abstract class BaseController extends HttpServlet {
     // 辅助方法：判断是否为基本数据类型
     private boolean isBasicType(Class<?> type) {
         return type == String.class || type == Integer.class || type == int.class ||
-                type == Long.class || type == long.class || type == Boolean.class || type == boolean.class;
+                type == Long.class || type == long.class ||
+                type == Double.class || type == double.class ||
+                type == Boolean.class || type == boolean.class;
     }
 
     // 辅助方法：简单类型转换
@@ -196,6 +198,7 @@ public abstract class BaseController extends HttpServlet {
         if (value == null) return null;
         if (type == Integer.class || type == int.class) return Integer.parseInt(value);
         if (type == Long.class || type == long.class) return Long.parseLong(value);
+        if (type == Double.class || type == double.class) return Double.parseDouble(value);
         if (type == Boolean.class || type == boolean.class) return Boolean.parseBoolean(value);
         return value;
     }

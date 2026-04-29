@@ -11,6 +11,7 @@ import com.video.utils.XmlSqlReaderUtil;
 import com.video.utils.JdbcUtils;
 import java.util.Collections;
 import java.util.List;
+import java.time.LocalDateTime;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -218,6 +219,30 @@ public class VideoMapperImpl implements VideoMapper {
     public List<Video> getHotTop50() {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getHotTop50");
         return executeQuery(Video.class, sql);
+    }
+
+    @Override
+    public List<Video> getHotCursorPage(Double cursorHotScore, LocalDateTime cursorCreateTime, Long cursorId, int limit) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getHotCursorPage");
+        return executeQuery(Video.class, sql,
+                cursorHotScore,
+                cursorHotScore,
+                cursorHotScore,
+                cursorCreateTime,
+                cursorHotScore,
+                cursorCreateTime,
+                cursorId,
+                limit);
+    }
+
+    @Override
+    public List<Video> getTimeCursorPage(LocalDateTime cursorCreateTime, Long cursorId, int limit) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getTimeCursorPage");
+        return executeQuery(Video.class, sql,
+                cursorCreateTime,
+                cursorCreateTime,
+                cursorId,
+                limit);
     }
 
     @Override

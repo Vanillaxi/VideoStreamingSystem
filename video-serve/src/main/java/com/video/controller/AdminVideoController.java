@@ -8,7 +8,7 @@ import com.video.service.VideoService;
 import jakarta.servlet.annotation.WebServlet;
 
 /**
- * 管理员用来手动刷库
+ * 管理员用来手动刷库测试
  */
 @WebServlet("/admin/video/view-count/*")
 public class AdminVideoController extends BaseController {

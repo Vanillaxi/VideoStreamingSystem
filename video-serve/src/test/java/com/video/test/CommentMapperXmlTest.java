@@ -15,6 +15,8 @@ public class CommentMapperXmlTest {
         assertSqlExists("com.video.mapper.CommentMapper.findRepliesByRootIds");
         assertSqlExists("com.video.mapper.CommentMapper.delete");
         assertSqlExists("com.video.mapper.CommentMapper.findPageByVideoIdHot");
+        assertSqlExists("com.video.mapper.CommentMapper.findCursorPageByVideoIdTime");
+        assertSqlExists("com.video.mapper.CommentMapper.findCursorPageByVideoIdHot");
         assertSqlExists("com.video.mapper.CommentMapper.updateReplyCount");
         assertSqlExists("com.video.mapper.CommentMapper.updateVideoCommentCount");
         assertSqlExists("com.video.mapper.FavoriteMapper.insertFavorite");
@@ -25,7 +27,10 @@ public class CommentMapperXmlTest {
         assertSqlExists("com.video.mapper.FollowMapper.findFollowerRelations");
         assertSqlExists("com.video.mapper.FollowMapper.findFriendRelations");
         assertSqlExists("com.video.mapper.UserMapper.getByIds");
+        assertSqlExists("com.video.mapper.UserMapper.getByUsernames");
         assertSqlExists("com.video.mapper.CategoryMapper.listEnabled");
+        assertSqlExists("com.video.mapper.CommentMentionMapper.insert");
+        assertSqlExists("com.video.mapper.NotificationMapper.insert");
         assertSqlExists("com.video.mapper.VideoMapper.updateFavoriteCount");
         assertSqlExists("com.video.mapper.VideoMapper.getByIds");
         assertSqlExists("com.video.mapper.VideoMapper.existsLike");
@@ -35,6 +40,8 @@ public class CommentMapperXmlTest {
         assertSqlExists("com.video.mapper.VideoMapper.getVideoPageByCategoryId");
         assertSqlExists("com.video.mapper.VideoMapper.getVideoPageByCategoryIdHot");
         assertSqlExists("com.video.mapper.VideoMapper.getHotTop50");
+        assertSqlExists("com.video.mapper.VideoMapper.getHotCursorPage");
+        assertSqlExists("com.video.mapper.VideoMapper.getTimeCursorPage");
         assertSqlExists("com.video.mapper.VideoMapper.getNewestPage");
         assertSqlExists("com.video.mapper.VideoMapper.getVideoCount");
     }

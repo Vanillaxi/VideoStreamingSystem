@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.CommentMentionMapper">
+
+    <insert id="insert">
+        INSERT INTO comment_mention
+        (comment_id, from_user_id, to_user_id, is_read, create_time)
+        VALUES (?, ?, ?, ?, ?)
+    </insert>
+
+</mapper>

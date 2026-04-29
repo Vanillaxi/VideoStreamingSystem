@@ -14,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import com.video.utils.XmlSqlReaderUtil;
@@ -112,6 +113,32 @@ public class CommentMapperImpl implements CommentMapper {
     public List<Comment> findPageByVideoId(Long videoId, int offset, int pageSize, String sort) {
         String sql = XmlSqlReaderUtil.getSql(commentPageSqlId(sort));
         return executeQuery(Comment.class, sql, videoId, offset, pageSize);
+    }
+
+    @Override
+    public List<Comment> findCursorPageByVideoIdTime(Long videoId, LocalDateTime cursorCreateTime, Long cursorId, int limit) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.CommentMapper.findCursorPageByVideoIdTime");
+        return executeQuery(Comment.class, sql,
+                videoId,
+                cursorCreateTime,
+                cursorCreateTime,
+                cursorId,
+                limit);
+    }
+
+    @Override
+    public List<Comment> findCursorPageByVideoIdHot(Long videoId, Double cursorHotScore, LocalDateTime cursorCreateTime, Long cursorId, int limit) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.CommentMapper.findCursorPageByVideoIdHot");
+        return executeQuery(Comment.class, sql,
+                videoId,
+                cursorHotScore,
+                cursorHotScore,
+                cursorHotScore,
+                cursorCreateTime,
+                cursorHotScore,
+                cursorCreateTime,
+                cursorId,
+                limit);
     }
 
     @Override

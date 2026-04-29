@@ -61,6 +61,17 @@ public class UserMapperImpl implements UserMapper {
     }
 
     @Override
+    public List<User> getByUsernames(List<String> usernames) {
+        if (usernames == null || usernames.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String sqlTemplate = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.getByUsernames");
+        String placeholders = String.join(",", Collections.nCopies(usernames.size(), "?"));
+        String sql = String.format(sqlTemplate, placeholders);
+        return JdbcUtils.executeQuery(User.class, sql, usernames.toArray());
+    }
+
+    @Override
     public void update(User user) {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.update");
         executeUpdate(sql,

@@ -9,6 +9,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+
+/**
+ * 定时1分钟刷库
+ */
 @Slf4j
 public class VideoViewCountFlushTask {
     private static final AtomicBoolean STARTED = new AtomicBoolean(false);

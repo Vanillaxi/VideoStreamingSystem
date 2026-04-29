@@ -61,6 +61,8 @@ CREATE TABLE `videos` (
                           PRIMARY KEY (`id`),
                           KEY `idx_videos_category_time` (`category_id`, `create_time`),
                           KEY `idx_videos_hot_score` (`hot_score`, `create_time`),
+                          KEY `idx_videos_hot_cursor` (`hot_score` DESC, `create_time` DESC, `id` DESC),
+                          KEY `idx_videos_time_cursor` (`create_time` DESC, `id` DESC),
                           CONSTRAINT `fk_video_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -124,6 +126,8 @@ CREATE TABLE `comments` (
                             `create_time`      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                             KEY `idx_comments_video_parent_time` (`video_id`, `parent_id`, `create_time`),
                             KEY `idx_comments_video_parent_hot` (`video_id`, `parent_id`, `hot_score`, `create_time`),
+                            KEY `idx_comments_video_time_cursor` (`video_id`, `parent_id`, `create_time` DESC, `id` DESC),
+                            KEY `idx_comments_video_hot_cursor` (`video_id`, `parent_id`, `hot_score` DESC, `create_time` DESC, `id` DESC),
                             KEY `idx_comments_root_time` (`root_id`, `create_time`),
                             KEY `idx_comments_parent` (`parent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
