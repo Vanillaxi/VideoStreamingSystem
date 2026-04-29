@@ -1,6 +1,7 @@
 package com.video.mapper.impl;
 
 import com.video.annotation.MyComponent;
+import com.video.exception.BusinessException;
 import com.video.pojo.entity.User;
 import com.video.mapper.UserMapper;
 import com.video.utils.JdbcUtils;
@@ -16,7 +17,7 @@ public class UserMapperImpl implements UserMapper {
     @Override
     public void insert(User user) {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.insert");
-        JdbcUtils.executeUpdate(sql,
+        int rows = JdbcUtils.executeUpdate(sql,
                 user.getUsername(),
                 user.getPassword(),
                 user.getRole(),
@@ -25,6 +26,9 @@ public class UserMapperImpl implements UserMapper {
                 user.getAvatarObjectKey(),
                 user.getCreatUser(),
                 user.getUpdateUser());
+        if (rows <= 0) {
+            throw new BusinessException("注册失败");
+        }
     }
 
     @Override

@@ -22,7 +22,7 @@ public class ServiceProxy implements InvocationHandler {
         } catch (Exception e) {
             //反射调用会把异常包在 InvocationTargetException 里，需要取出来
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            log.error("【AOP 异常捕捉】方法 {} 出错: {}", method.getName(), cause.getMessage());
+            log.error("【AOP 异常捕捉】方法 {} 出错: {}", method.getName(), cause.getMessage(), cause);
             throw cause; // 继续向上抛，给 Controller 捕获
         }
     }

@@ -102,7 +102,7 @@ public class VideoController extends BaseController {
         try {
             uploadedObject = new OssClientUtil().uploadVideo(file);
         } catch (IllegalArgumentException | IllegalStateException | IOException e) {
-            log.warn("视频上传失败: {}", e.getMessage());
+            log.warn("视频上传失败: {}", e.getMessage(), e);
             return Result.error(e.getMessage());
         }
 

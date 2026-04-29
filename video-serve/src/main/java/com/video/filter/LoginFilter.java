@@ -46,6 +46,18 @@ public class LoginFilter implements Filter {
             String path = req.getRequestURI();
             log.info("Filter正在校验路径: {}", path);
 
+            String contextPath = req.getContextPath();
+            String servletPath = path;
+            if (contextPath != null && !contextPath.isEmpty() && path.startsWith(contextPath)) {
+                servletPath = path.substring(contextPath.length());
+            }
+
+            if (servletPath.equals("/ws") || servletPath.startsWith("/ws/")) {
+                log.info("WebSocket 握手路径已放行: {}", path);
+                chain.doFilter(request, response);
+                return;
+            }
+
             if (path.contains("/login") || path.contains("/register")) {
                 log.info("放行: {}", path);
                 chain.doFilter(request, response);

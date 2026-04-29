@@ -29,6 +29,10 @@ public class UserServiceImpl implements UserService {
     //注册
     @Override
     public void register(User user) {
+        if (user == null || user.getUsername() == null || user.getUsername().isBlank()
+                || user.getPassword() == null || user.getPassword().isBlank()) {
+            throw new BusinessException(400, "用户名和密码不能为空");
+        }
         if (userMapper.getByUsername(user.getUsername()) != null) {
             throw new BusinessException(ErrorCode.ACCOUNT_ALREADY_EXIST);
         }

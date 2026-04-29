@@ -14,7 +14,7 @@ public interface FollowService {
 
 
     //更改关注
-    void changeFollow(Long followingId);
+    String changeFollow(Long followingId);
 
 
     Boolean isFollow(Long idA);

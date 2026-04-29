@@ -6,6 +6,7 @@ import com.video.annotation.MyMapping;
 import com.video.pojo.dto.PageResult;
 import com.video.pojo.dto.Result;
 import com.video.service.FollowService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.annotation.WebServlet;
 
 @WebServlet("/follow/*")
@@ -66,13 +67,19 @@ public class FollowController extends BaseController {
 
     /**
      * 更改关注
-     * @param FollowingId
+     * @param followingId
      * @return
      */
     @MyMapping (value="/changeFollow",method="POST")
-    public Result changeFollow(Long FollowingId){
-        followService.changeFollow(FollowingId);
-        return Result.success("修改关注成功");
+    public Result changeFollow(Long followingId, HttpServletRequest request){
+        if (followingId == null) {
+            String legacyFollowingId = request.getParameter("FollowingId");
+            if (legacyFollowingId != null && !legacyFollowingId.isBlank()) {
+                followingId = Long.valueOf(legacyFollowingId);
+            }
+        }
+        String message = followService.changeFollow(followingId);
+        return Result.success(message);
     }
 
 }

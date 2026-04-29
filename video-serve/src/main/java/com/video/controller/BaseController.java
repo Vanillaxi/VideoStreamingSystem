@@ -162,11 +162,11 @@ public abstract class BaseController extends HttpServlet {
             Throwable cause = e.getCause(); // 获取 invoke 抛出的真实异常
 
             if (cause instanceof BaseException) {
-                log.warn("业务异常 [{}]: {}", path, cause.getMessage());
+                log.warn("业务异常 [{}]: {}", path, cause.getMessage(), cause);
                 resp.getWriter().write(JSONUtil.toJson(Result.error(cause.getMessage())));
             } else {
-                log.error("系统崩溃", e);
-                log.error("系统崩溃 [{}]: ", path, cause);
+                Throwable realException = cause == null ? e : cause;
+                log.error("系统崩溃 [{}]", path, realException);
                 resp.getWriter().write(JSONUtil.toJson(Result.error("系统繁忙，请稍后再试")));
             }
         } finally {

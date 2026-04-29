@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -104,7 +103,7 @@ public class FavoriteServiceImpl implements FavoriteService {
 
         long start = (long) (page - 1) * pageSize;
         long end = start + pageSize - 1;
-        Set<String> videoIdSet = RedisUtil.zrevrange(key, start, end);
+        List<String> videoIdSet = RedisUtil.zrevrange(key, start, end);
         Long total = RedisUtil.zcard(key);
 
         if (videoIdSet == null || videoIdSet.isEmpty()) {

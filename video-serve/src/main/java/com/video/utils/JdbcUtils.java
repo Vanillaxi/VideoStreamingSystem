@@ -1,6 +1,8 @@
 package com.video.utils;
 
 import com.video.config.DBPool;
+import com.video.exception.ErrorCode;
+import com.video.exception.SystemException;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.Field;
@@ -25,7 +27,7 @@ public class JdbcUtils {
             }
         } catch (SQLException e) {
             log.error("SQL更新失败! 语句: {}", sql, e);
-            return -1;
+            throw new SystemException(ErrorCode.SYSTEM_ERROR, e);
         } finally {
             DBPool.releaseConnection(conn);
         }
@@ -96,7 +98,14 @@ public class JdbcUtils {
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 setParameters(pstmt, params);
                 try (ResultSet rs = pstmt.executeQuery()) {
-                    return rs.next();
+                    if (!rs.next()) {
+                        return false;
+                    }
+                    Object value = rs.getObject(1);
+                    if (value instanceof Number) {
+                        return ((Number) value).longValue() > 0;
+                    }
+                    return true;
                 }
             }
         } catch (Exception e) {

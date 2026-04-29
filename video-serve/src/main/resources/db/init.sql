@@ -12,7 +12,7 @@ CREATE TABLE `user` (
                         `password`    VARCHAR(64) NOT NULL COMMENT 'BCrypt加密后的密码',
                         `nickname`    VARCHAR(50) DEFAULT '用户' COMMENT '昵称',
                         `avatar_url`  VARCHAR(500) COMMENT '头像访问地址',
-                        `avatar_object_key` VARCHAR(255) COMMENT '头像OSS对象Key',
+                        `avatar_object_key` VARCHAR(255) NULL COMMENT '头像OSS对象Key',
                         `role`        TINYINT DEFAULT 0 COMMENT '0-普通用户，1-管理员',
                         `create_user` VARCHAR(32) DEFAULT 'system' COMMENT '创建人',
                         `update_user` VARCHAR(32) COMMENT '更新人',

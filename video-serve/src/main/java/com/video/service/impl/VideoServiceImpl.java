@@ -5,8 +5,10 @@ import com.video.annotation.MyComponent;
 import com.video.exception.BusinessException;
 import com.video.exception.ErrorCode;
 import com.video.exception.SystemException;
+import com.video.messageQueue.KafkaProducerUtil;
 import com.video.pojo.dto.CursorPageResult;
 import com.video.pojo.dto.PageResult;
+import com.video.pojo.dto.VideoPublishedEvent;
 import com.video.pojo.entity.Video;
 import com.video.pojo.entity.User;
 import com.video.mapper.VideoMapper;
@@ -23,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -83,6 +86,7 @@ public class VideoServiceImpl implements VideoService {
         video.setViewCount(video.getViewCount() == null ? 0L : video.getViewCount());
         video.setHotScore(calculateHotScore(video));
         videoMapper.postVideo(video);
+        sendVideoPublishedEvent(video);
         clearListCache(video.getCategoryId());
     }
 
@@ -418,6 +422,24 @@ public class VideoServiceImpl implements VideoService {
         long favoriteCount = video.getFavoriteCount() == null ? 0L : video.getFavoriteCount();
         long viewCount = video.getViewCount() == null ? 0L : video.getViewCount();
         return likeCount * 3D + commentCount * 5D + favoriteCount * 4D + viewCount + 100D;
+    }
+
+    private void sendVideoPublishedEvent(Video video) {
+        if (video.getId() == null) {
+            log.warn("视频发布 Kafka 消息跳过：videoId 为空，title={}", video.getTitle());
+            return;
+        }
+        VideoPublishedEvent event = new VideoPublishedEvent();
+        event.setEventId(UUID.randomUUID().toString());
+        event.setVideoId(video.getId());
+        event.setAuthorId(video.getUserId());
+        event.setCreatedAt(video.getCreateTime()
+                .atZone(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli());
+        event.setHotScore(video.getHotScore());
+        event.setEventType("VIDEO_PUBLISHED");
+        KafkaProducerUtil.sendVideoPublished(event);
     }
 
 

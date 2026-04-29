@@ -21,7 +21,6 @@ import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -90,7 +89,10 @@ public class FollowServiceImpl implements FollowService {
      * @param targetUserId
      */
     @Override
-    public void changeFollow(Long targetUserId) {
+    public String changeFollow(Long targetUserId) {
+        if (targetUserId == null) {
+            throw new BusinessException(400, "关注用户ID不能为空");
+        }
         Long myId = UserHolder.getUser().getId();
         if(myId.equals(targetUserId)){
             throw new BusinessException(ErrorCode.NOT_ALLOW_FOLLOW);
@@ -111,6 +113,7 @@ public class FollowServiceImpl implements FollowService {
                 log.info("用户 {} 取消关注了 {}", myId, targetUserId);
             }
         }
+        return delta > 0 ? "关注成功" : "取消关注成功";
     }
 
     /**
@@ -136,7 +139,7 @@ public class FollowServiceImpl implements FollowService {
     private PageResult getUsersFromZSet(String key, int page, int pageSize) {
         long start = (long) (page - 1) * pageSize;
         long end = start + pageSize - 1;
-        Set<String> userIdSet = RedisUtil.zrevrange(key, start, end);
+        List<String> userIdSet = RedisUtil.zrevrange(key, start, end);
         Long total = RedisUtil.zcard(key);
         if (userIdSet == null || userIdSet.isEmpty()) {
             return new PageResult(total == null ? 0L : total, new ArrayList<>());

@@ -85,10 +85,10 @@ public class JWTUtil {
             parse(token);
             return true;
         } catch (ExpiredJwtException e) {
-            log.warn("Token已过期");
+            log.warn("Token已过期", e);
             return false;
         } catch (JwtException e) {
-            log.warn("Token无效: " + e.getMessage());
+            log.warn("Token无效: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -106,7 +106,7 @@ public class JWTUtil {
             // 重新生成一个全新的令牌返回
             return generate(userId, username, role);
         } catch (Exception e) {
-            log.error("刷新令牌失败: " + e.getMessage());
+            log.error("刷新令牌失败: {}", e.getMessage(), e);
             return null;
         }
     }

@@ -3,12 +3,15 @@ package com.video.utils;
 import com.video.config.RedisConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
+import redis.clients.jedis.resps.Tuple;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 public class RedisUtil {
@@ -161,6 +164,22 @@ public class RedisUtil {
         }
     }
 
+    public static void zaddBatch(Map<String, Double> keyScoreMap, String member) {
+        if (keyScoreMap == null || keyScoreMap.isEmpty()) {
+            return;
+        }
+        try (Jedis jedis = getJedis()) {
+            Pipeline pipeline = jedis.pipelined();
+            for (Map.Entry<String, Double> entry : keyScoreMap.entrySet()) {
+                pipeline.zadd(entry.getKey(), entry.getValue(), member);
+            }
+            pipeline.sync();
+        } catch (Exception e) {
+            log.error("Redis zadd batch 操作失败", e);
+            throw e;
+        }
+    }
+
     //获取score
     public static Double zscore(String key, String member) {
         try (Jedis jedis = getJedis()) {
@@ -195,26 +214,35 @@ public class RedisUtil {
      * @param key 键
      * @param start 开始索引 (0 开始)
      * @param end 结束索引
-     * @return 成员集合
+     * @return 成员列表
      */
-    public static java.util.Set<String> zrevrange(String key, long start, long end) {
+    public static List<String> zrevrange(String key, long start, long end) {
         try (Jedis jedis = getJedis()) {
-            return (java.util.Set<String>) jedis.zrevrange(key, start, end);
+            return jedis.zrevrange(key, start, end);
         } catch (Exception e) {
             log.error("Redis zrevrange 操作失败", e);
-            return null;
+            return Collections.emptyList();
+        }
+    }
+
+    public static List<Tuple> zrevrangeByScoreWithScores(String key, double max, double min, int offset, int count) {
+        try (Jedis jedis = getJedis()) {
+            return jedis.zrevrangeByScoreWithScores(key, max, min, offset, count);
+        } catch (Exception e) {
+            log.error("Redis zrevrangeByScoreWithScores 操作失败", e);
+            return Collections.emptyList();
         }
     }
 
     /**
      * ZSet 正序分页查询 (从小到大)
      */
-    public static java.util.Set<String> zrange(String key, long start, long end) {
+    public static List<String> zrange(String key, long start, long end) {
         try (Jedis jedis = getJedis()) {
-            return (java.util.Set<String>) jedis.zrange(key, start, end);
+            return jedis.zrange(key, start, end);
         } catch (Exception e) {
             log.error("Redis zrange 操作失败", e);
-            return null;
+            return Collections.emptyList();
         }
     }
 

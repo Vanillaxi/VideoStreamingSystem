@@ -43,7 +43,7 @@ public class UserController extends BaseController {
 
     /**
      * 登出
-     * @param token
+     * @param authorization
      * @return
      */
     @MyMapping(value = "/logout", method = "POST")

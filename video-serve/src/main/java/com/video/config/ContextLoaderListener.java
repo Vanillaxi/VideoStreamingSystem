@@ -1,5 +1,9 @@
 package com.video.config;
 
+import com.video.messageQueue.KafkaProducerUtil;
+import com.video.messageQueue.KafkaTestConsumer;
+import com.video.messageQueue.KafkaTestProducer;
+import com.video.messageQueue.VideoPublishConsumer;
 import com.video.proxy.BeanFactory;
 import com.video.task.VideoViewCountFlushTask;
 import com.video.utils.CacheClient;
@@ -28,6 +32,8 @@ public class ContextLoaderListener implements ServletContextListener {
         try {
             BeanFactory.init();
             VideoViewCountFlushTask.start();
+            VideoPublishConsumer.start();
+            KafkaTestConsumer.start();
             log.info(">>> 所有模块初始化成功，系统已就绪 <<<");
         } catch (Exception e) {
             log.error("!!! 项目启动初始化失败 !!!", e);
@@ -41,6 +47,10 @@ public class ContextLoaderListener implements ServletContextListener {
 
         try {
             UserHolder.removeUser();
+            KafkaTestConsumer.shutdown();
+            KafkaTestProducer.close();
+            VideoPublishConsumer.shutdown();
+            KafkaProducerUtil.close();
             VideoViewCountFlushTask.shutdown();//定时刷库任务启动
             BeanFactory.destroy();
             DBPool.close();

@@ -79,7 +79,7 @@ public class FollowMapperImpl implements FollowMapper {
                 pstmt.setLong(1, followingId);
                 pstmt.setLong(2, followerId);
                 try (ResultSet rs = pstmt.executeQuery()) {
-                    exists = rs.next();
+                    exists = rs.next() && rs.getLong(1) > 0;
                 }
             }
 

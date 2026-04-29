@@ -57,22 +57,34 @@ public class VideoMapperImpl implements VideoMapper {
     @Override
     public void postVideo(Video video) {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.postVideo");
-        JdbcUtils.executeUpdate(sql,
-                video.getTitle(),
-                video.getDescription(),
-                video.getCategoryId(),
-                video.getUserId(),
-                video.getVideoUrl(),
-                video.getObjectKey(),
-                video.getSize(),
-                video.getStatus(),
-                video.getLikesCount(),
-                video.getCommentCount(),
-                video.getFavoriteCount(),
-                video.getViewCount(),
-                video.getHotScore(),
-                video.getCreateTime(),
-                video.getUpdateTime());
+        Connection conn = DBPool.getConnection();
+        try (PreparedStatement pstmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setObject(1, video.getTitle());
+            pstmt.setObject(2, video.getDescription());
+            pstmt.setObject(3, video.getCategoryId());
+            pstmt.setObject(4, video.getUserId());
+            pstmt.setObject(5, video.getVideoUrl());
+            pstmt.setObject(6, video.getObjectKey());
+            pstmt.setObject(7, video.getSize());
+            pstmt.setObject(8, video.getStatus());
+            pstmt.setObject(9, video.getLikesCount());
+            pstmt.setObject(10, video.getCommentCount());
+            pstmt.setObject(11, video.getFavoriteCount());
+            pstmt.setObject(12, video.getViewCount());
+            pstmt.setObject(13, video.getHotScore());
+            pstmt.setObject(14, video.getCreateTime());
+            pstmt.setObject(15, video.getUpdateTime());
+            pstmt.executeUpdate();
+            try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    video.setId(rs.getLong(1));
+                }
+            }
+        } catch (Exception e) {
+            throw new SystemException(ErrorCode.SYSTEM_ERROR, e);
+        } finally {
+            DBPool.releaseConnection(conn);
+        }
     }
 
     @Override

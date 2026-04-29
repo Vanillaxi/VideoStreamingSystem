@@ -6,9 +6,16 @@ info:
     根据当前 Java Servlet Controller/@MyMapping 扫描生成。
 
     认证说明：
-    - 使用 Authorization: Bearer {token}
+    - 使用 Authorization: Bearer {{bearerToken}}
 
-    根据当前已有 Servlet 接口生成：用户、视频、评论、关注、收藏、分类。
+    根据当前已有 Servlet 接口生成：用户、视频、评论、关注、收藏、分类、Feed、Kafka 测试。
+
+    WebSocket 实时通知：
+    - 连接地址：ws://localhost:8080/video-serve/ws/{userId}
+    - Apifox Header：Authorization = Bearer {{bearerToken}}
+    - 兼容 Query：ws://localhost:8080/video-serve/ws/{userId}?token={{bearerToken}}
+    - LoginFilter 会放行 /ws/* 握手请求，实际鉴权由 WebSocket 服务端完成。
+    - 收到 Kafka Feed 推送时，在线粉丝会收到 NEW_VIDEO 消息。
 servers:
   - url: http://localhost:8080/video-serve
     description: Local Tomcat
@@ -27,6 +34,12 @@ tags:
     description: 视频分区模块
   - name: Admin
     description: 管理接口
+  - name: Feed
+    description: 关注流 Feed 模块
+  - name: Test
+    description: 本地测试接口
+  - name: WebSocket
+    description: WebSocket 实时通知说明
 
 paths:
   /user/register:
@@ -398,6 +411,123 @@ paths:
         default:
           $ref: '#/components/responses/ErrorResponse'
 
+  /video/list/hot:
+    get:
+      tags: [Video]
+      summary: 首页热门视频 Top50
+      operationId: getHotTop50
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      responses:
+        '200':
+          description: 热门视频 Top50
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VideoPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/list/hot/cursor:
+    get:
+      tags: [Video]
+      summary: 热度游标分页查询视频
+      description: 第一页不传游标；后续页传上一页返回的 nextHotScore、nextCreateTime、nextId。
+      operationId: getHotCursorPage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/CursorHotScore'
+        - $ref: '#/components/parameters/CursorCreateTime'
+        - $ref: '#/components/parameters/CursorId'
+        - $ref: '#/components/parameters/CursorPageSize'
+      responses:
+        '200':
+          description: 视频游标分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VideoCursorPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/feed/cursor:
+    get:
+      tags: [Video]
+      summary: 全站视频 Feed 游标分页
+      description: sort=time 时只需要 cursorCreateTime + cursorId；sort=hot 时需要 cursorHotScore + cursorCreateTime + cursorId。
+      operationId: getVideoFeedCursorPage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CursorHotScore'
+        - $ref: '#/components/parameters/CursorCreateTime'
+        - $ref: '#/components/parameters/CursorId'
+        - $ref: '#/components/parameters/CursorPageSize'
+      responses:
+        '200':
+          description: 视频游标分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VideoCursorPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/list/new:
+    get:
+      tags: [Video]
+      summary: 最新视频分页列表
+      operationId: getNewestVideos
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 最新视频分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VideoPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
   /video/post:
     post:
       tags: [Video]
@@ -637,6 +767,48 @@ paths:
         default:
           $ref: '#/components/responses/ErrorResponse'
 
+  /feed/following:
+    get:
+      tags: [Feed]
+      summary: 查询当前用户关注流 Feed
+      description: 从 Redis ZSet feed:user:{userId} 游标分页读取 videoId，并批量查询视频详情。
+      operationId: getFollowingFeed
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: lastScore
+          in: query
+          required: false
+          schema:
+            type: number
+            format: double
+          description: 上一页最后一条 Feed 的 score，第一页不传
+        - name: lastId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 上一页最后一条视频ID，第一页不传
+        - $ref: '#/components/parameters/CursorPageSize'
+      responses:
+        '200':
+          description: 关注流 Feed 分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FollowingFeedResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
   /comment/list:
     get:
       tags: [Comment]
@@ -667,6 +839,44 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/CommentPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /comment/list/cursor:
+    get:
+      tags: [Comment]
+      summary: 评论游标分页查询，两级结构返回
+      description: sort=time 时传 cursorCreateTime + cursorId；sort=hot 时传 cursorHotScore + cursorCreateTime + cursorId。第一页不传游标。
+      operationId: listCommentsCursor
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/CursorHotScore'
+        - $ref: '#/components/parameters/CursorCreateTime'
+        - $ref: '#/components/parameters/CursorId'
+        - $ref: '#/components/parameters/CursorPageSize'
+      responses:
+        '200':
+          description: 评论游标分页结果，records 为一级评论，replies 为子评论平铺列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentCursorPageResult'
         '401':
           $ref: '#/components/responses/UnauthorizedResponse'
         default:
@@ -879,24 +1089,127 @@ paths:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/AuthorizationHeader'
-        - name: FollowingId
+        - name: followingId
           in: query
           required: true
           schema:
             type: integer
             format: int64
-          description: 目标用户ID；参数名按当前 Controller 大写 F 保留
+          description: 目标用户ID
       responses:
         '200':
-          description: 修改关注成功
+          description: 关注成功或取消关注成功
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StringResult'
+              examples:
+                follow:
+                  summary: 关注成功
+                  value:
+                    code: 1
+                    msg: success
+                    data: 关注成功
+                unfollow:
+                  summary: 取消关注成功
+                  value:
+                    code: 1
+                    msg: success
+                    data: 取消关注成功
         '401':
           $ref: '#/components/responses/UnauthorizedResponse'
         default:
           $ref: '#/components/responses/ErrorResponse'
+
+  /test/kafka/send:
+    post:
+      tags: [Test]
+      summary: 发送 Kafka 测试消息
+      description: 本地开发测试接口。手动指定 videoId、authorId、createdAt，发送 VIDEO_PUBLISHED 消息到 video_publish，用于测试 Kafka Consumer、Redis Feed 和 WebSocket 推送。
+      operationId: sendKafkaTestMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KafkaTestMessageRequest'
+            example:
+              videoId: 1001
+              authorId: 2
+              createdAt: 1777440000000
+      responses:
+        '200':
+          description: Kafka 测试消息已发送，data 返回完整发送消息 JSON 字符串
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+              example:
+                code: 1
+                msg: success
+                data: '{"type":"VIDEO_PUBLISHED","videoId":1001,"authorId":2,"createdAt":1777440000000}'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /ws/{userId}:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket 实时通知连接地址（ws 协议）
+      description: |
+        这是 WebSocket 连接说明，不是普通 HTTP 接口。
+        在 Apifox 中请新建 WebSocket 请求，协议选择 ws，不要用 HTTP GET 调用。
+
+        WebSocket URL：
+        ws://localhost:8080/video-serve/ws/3
+
+        Apifox 连接认证：
+        Header 名称：Authorization
+        Header 值：Bearer {{bearerToken}}
+
+        兼容连接方式：
+        ws://localhost:8080/video-serve/ws/3?token={{bearerToken}}
+
+        如果 query 中传完整 Bearer 值，需要 URL 编码空格：
+        ws://localhost:8080/video-serve/ws/3?token=Bearer%20{{bearerToken}}
+
+        注意：
+        - /ws/{userId} 中的 userId 必须和 token 中的 userId 一致。
+        - LoginFilter 会放行 /ws/* 握手请求，WebSocket 内部会继续校验 Authorization 或 token。
+
+        Kafka Consumer 推送在线粉丝时，消息示例：
+        {"type":"NEW_VIDEO","videoId":1,"authorId":2,"createdAt":1777440000000,"content":"你关注的用户发布了新视频"}
+      operationId: websocketNotification
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+            example: Bearer {{bearerToken}}
+          description: WebSocket 握手 Header，推荐 Apifox 使用该方式。
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 当前登录用户ID，必须和 token 中的 userId 一致。
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+            example: "{{bearerToken}}"
+          description: WebSocket 兼容认证参数；Header Authorization 不可用时使用。
+      responses:
+        '101':
+          description: WebSocket 握手成功，协议切换为 ws。该接口不能按普通 HTTP 请求测试。
 
 components:
   securitySchemes:
@@ -912,8 +1225,8 @@ components:
       required: true
       schema:
         type: string
-        example: Bearer eyJhbGciOi...
-      description: 标准 Bearer Token 请求头。
+        example: Bearer {{bearerToken}}
+      description: 标准 Bearer Token 请求头，Apifox 全局变量名为 bearerToken。
     Page:
       name: page
       in: query
@@ -941,6 +1254,40 @@ components:
         enum: [time, hot]
         default: time
       description: 排序方式，time 按 create_time DESC，hot 按 hot_score DESC
+    CursorHotScore:
+      name: cursorHotScore
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+      description: 热度游标；sort=hot 的后续页需要传上一页返回的 nextHotScore
+    CursorCreateTime:
+      name: cursorCreateTime
+      in: query
+      required: false
+      schema:
+        type: string
+        example: "2026-04-29 09:30:00"
+      description: 时间游标；后续页传上一页返回的 nextCreateTime
+    CursorId:
+      name: cursorId
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int64
+      description: ID 游标；后续页传上一页返回的 nextId
+    CursorPageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+      description: 游标分页每页数量，默认 20，最大 50
     UserId:
       name: userId
       in: query
@@ -1019,6 +1366,25 @@ components:
               type: string
             data:
               nullable: true
+
+    KafkaTestMessageRequest:
+      type: object
+      properties:
+        videoId:
+          type: integer
+          format: int64
+          example: 1001
+          description: 测试视频ID，不传默认 1。
+        authorId:
+          type: integer
+          format: int64
+          example: 2
+          description: 测试作者ID，不依赖当前登录用户，不传默认 1。
+        createdAt:
+          type: integer
+          format: int64
+          example: 1777440000000
+          description: 视频发布时间戳，毫秒；不传默认 System.currentTimeMillis()。
 
     PageResult:
       type: object
@@ -1234,6 +1600,30 @@ components:
           items:
             $ref: '#/components/schemas/Video'
 
+    VideoCursorPageResult:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/Video'
+        hasNext:
+          type: boolean
+        nextHotScore:
+          type: number
+          format: double
+          nullable: true
+        nextCreateTime:
+          type: string
+          format: date-time
+          nullable: true
+        nextId:
+          type: integer
+          format: int64
+          nullable: true
+        pageSize:
+          type: integer
+
     CommentPageResult:
       type: object
       properties:
@@ -1244,6 +1634,50 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Comment'
+
+    CommentCursorPageResult:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        hasNext:
+          type: boolean
+        nextHotScore:
+          type: number
+          format: double
+          nullable: true
+        nextCreateTime:
+          type: string
+          format: date-time
+          nullable: true
+        nextId:
+          type: integer
+          format: int64
+          nullable: true
+        pageSize:
+          type: integer
+
+    FollowingFeedResult:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Video'
+        nextLastScore:
+          type: number
+          format: double
+          nullable: true
+        nextLastId:
+          type: integer
+          format: int64
+          nullable: true
+        hasMore:
+          type: boolean
+        pageSize:
+          type: integer
 
     UserPageResult:
       type: object
