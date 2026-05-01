@@ -21,6 +21,8 @@ public class XmlSqlReaderUtil {
         loadSql("mapper/CategoryMapper.xml");
         loadSql("mapper/CommentMentionMapper.xml");
         loadSql("mapper/NotificationMapper.xml");
+        loadSql("mapper/CouponMapper.xml");
+        loadSql("mapper/CouponOrderMapper.xml");
     }
 
     private static void loadSql(String path) {

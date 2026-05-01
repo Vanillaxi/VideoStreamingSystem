@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.CouponOrderMapper">
+
+    <select id="getByCouponIdAndUserId" resultType="com.video.pojo.entity.CouponOrder">
+        SELECT
+        id,
+        coupon_id AS couponId,
+        user_id AS userId,
+        coupon_code AS couponCode,
+        status,
+        create_time AS createTime
+        FROM coupon_order
+        WHERE coupon_id = ?
+          AND user_id = ?
+    </select>
+
+    <insert id="insert">
+        INSERT INTO coupon_order
+        (coupon_id, user_id, coupon_code, status, create_time)
+        VALUES (?, ?, ?, ?, NOW())
+    </insert>
+
+</mapper>

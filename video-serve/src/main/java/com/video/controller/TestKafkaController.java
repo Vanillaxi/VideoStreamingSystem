@@ -1,7 +1,7 @@
 package com.video.controller;
 
 import com.video.annotation.MyMapping;
-import com.video.messageQueue.KafkaTestProducer;
+import com.video.messageQueue.kafka.KafkaTestProducer;
 import com.video.pojo.dto.KafkaTestMessageRequest;
 import com.video.pojo.dto.Result;
 import jakarta.servlet.annotation.WebServlet;

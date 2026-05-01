@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mapper namespace="com.video.mapper.CouponMapper">
+
+    <insert id="create">
+        INSERT INTO coupon
+        (title, stock, start_time, end_time, status, create_time, update_time)
+        VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+    </insert>
+
+    <select id="listAll" resultType="com.video.pojo.entity.Coupon">
+        SELECT
+        id,
+        title,
+        stock,
+        start_time AS startTime,
+        end_time AS endTime,
+        status,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM coupon
+        ORDER BY create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="listByStatus" resultType="com.video.pojo.entity.Coupon">
+        SELECT
+        id,
+        title,
+        stock,
+        start_time AS startTime,
+        end_time AS endTime,
+        status,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM coupon
+        WHERE status = ?
+        ORDER BY create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="countAll" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM coupon
+    </select>
+
+    <select id="countByStatus" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM coupon
+        WHERE status = ?
+    </select>
+
+    <select id="getById" resultType="com.video.pojo.entity.Coupon">
+        SELECT
+        id,
+        title,
+        stock,
+        start_time AS startTime,
+        end_time AS endTime,
+        status,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM coupon
+        WHERE id = ?
+    </select>
+
+    <select id="getByIdForUpdate" resultType="com.video.pojo.entity.Coupon">
+        SELECT
+        id,
+        title,
+        stock,
+        start_time AS startTime,
+        end_time AS endTime,
+        status,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM coupon
+        WHERE id = ?
+        FOR UPDATE
+    </select>
+
+    <update id="decreaseStock">
+        UPDATE coupon
+        SET stock = stock - 1,
+            update_time = NOW()
+        WHERE id = ?
+          AND stock > 0
+    </update>
+
+</mapper>

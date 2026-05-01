@@ -5,7 +5,7 @@ import com.video.annotation.MyComponent;
 import com.video.exception.BusinessException;
 import com.video.exception.ErrorCode;
 import com.video.exception.SystemException;
-import com.video.messageQueue.KafkaProducerUtil;
+import com.video.messageQueue.kafka.KafkaProducerUtil;
 import com.video.pojo.dto.CursorPageResult;
 import com.video.pojo.dto.PageResult;
 import com.video.pojo.dto.VideoPublishedEvent;

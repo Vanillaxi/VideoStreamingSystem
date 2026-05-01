@@ -1,4 +1,4 @@
-package com.video.messageQueue;
+package com.video.messageQueue.kafka;
 
 import com.video.pojo.dto.VideoPublishedEvent;
 import com.video.utils.JSONUtil;

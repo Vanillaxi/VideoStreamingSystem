@@ -1,4 +1,4 @@
-package com.video.messageQueue;
+package com.video.messageQueue.kafka;
 
 import com.video.mapper.FollowMapper;
 import com.video.pojo.dto.RealtimeFeedMessage;

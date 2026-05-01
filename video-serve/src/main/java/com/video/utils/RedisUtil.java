@@ -42,6 +42,15 @@ public class RedisUtil {
         }
     }
 
+    public static void setPersistent(String key, String value) {
+        try (Jedis jedis = getJedis()) {
+            jedis.set(key, value);
+        } catch (Exception e) {
+            log.error("Redis set persistent 操作失败", e);
+            throw e;
+        }
+    }
+
     public static String get(String key) {
         try (Jedis jedis = getJedis()) {
             return jedis.get(key);
@@ -56,6 +65,20 @@ public class RedisUtil {
             return jedis.exists(key);
         } catch (Exception e) {
             log.error("Redis exists 操作失败", e);
+            return false;
+        }
+    }
+
+    public static boolean setIfAbsent(String key, String value, int seconds) {
+        try (Jedis jedis = getJedis()) {
+            Long result = jedis.setnx(key, value);
+            if (result != null && result == 1L) {
+                jedis.expire(key, seconds);
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            log.error("Redis setIfAbsent 操作失败", e);
             return false;
         }
     }
@@ -78,6 +101,15 @@ public class RedisUtil {
         }
     }
 
+    public static Long decrBy(String key, long decrement) {
+        try (Jedis jedis = getJedis()) {
+            return jedis.decrBy(key, decrement);
+        } catch (Exception e) {
+            log.error("Redis decrBy 操作失败", e);
+            return null;
+        }
+    }
+
     public static List<String> scanKeys(String pattern) {
         List<String> keys = new ArrayList<>();
         try (Jedis jedis = getJedis()) {
@@ -96,8 +128,12 @@ public class RedisUtil {
     }
 
     public static Long evalLong(String script, List<String> keys) {
+        return evalLong(script, keys, Collections.emptyList());
+    }
+
+    public static Long evalLong(String script, List<String> keys, List<String> args) {
         try (Jedis jedis = getJedis()) {
-            Object result = jedis.eval(script, keys, Collections.emptyList());
+            Object result = jedis.eval(script, keys, args == null ? Collections.emptyList() : args);
             if (result == null) {
                 return 0L;
             }

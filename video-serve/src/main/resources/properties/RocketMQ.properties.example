@@ -1,0 +1,5 @@
+rocketmq.namesrvAddr=localhost:9876
+rocketmq.topic.couponSeckillTx=coupon_seckill_tx
+rocketmq.producerGroup.couponSeckillTx=coupon_seckill_tx_producer_group
+rocketmq.consumerGroup.couponSeckillTx=coupon_seckill_tx_consumer_group
+rocketmq.consumerMaxReconsumeTimes.couponSeckillTx=16

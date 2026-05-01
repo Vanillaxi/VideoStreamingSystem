@@ -8,7 +8,7 @@ info:
     认证说明：
     - 使用 Authorization: Bearer {{bearerToken}}
 
-    根据当前已有 Servlet 接口生成：用户、视频、评论、关注、收藏、分类、Feed、Kafka 测试。
+    根据当前已有 Servlet 接口生成：用户、视频、评论、关注、收藏、分类、Feed、优惠券秒杀、Kafka 测试。
 
     WebSocket 实时通知：
     - 连接地址：ws://localhost:8080/video-serve/ws/{userId}
@@ -16,6 +16,12 @@ info:
     - 兼容 Query：ws://localhost:8080/video-serve/ws/{userId}?token={{bearerToken}}
     - LoginFilter 会放行 /ws/* 握手请求，实际鉴权由 WebSocket 服务端完成。
     - 收到 Kafka Feed 推送时，在线粉丝会收到 NEW_VIDEO 消息。
+    - 优惠券秒杀结果通过 COUPON_SECKILL_RESULT 消息推送。
+
+    异步消息说明：
+    - video_publish：Kafka，视频发布后写入粉丝 Feed。
+    - coupon_seckill_tx：RocketMQ 事务消息，Redis Lua 预扣成功后执行本地事务创建 coupon_order。
+    - message_outbox 表结构暂时保留，但秒杀主链路不再写入、不再读取。
 servers:
   - url: http://localhost:8080/video-serve
     description: Local Tomcat
@@ -32,6 +38,8 @@ tags:
     description: 视频收藏模块
   - name: Category
     description: 视频分区模块
+  - name: Coupon
+    description: 优惠券秒杀模块
   - name: Admin
     description: 管理接口
   - name: Feed
@@ -1157,6 +1165,216 @@ paths:
         default:
           $ref: '#/components/responses/ErrorResponse'
 
+  /admin/coupon/create:
+    post:
+      tags: [Admin, Coupon]
+      summary: 管理员创建优惠券
+      description: |
+        内部管理接口，需要 role >= 2。
+        MySQL 创建成功后初始化 Redis 秒杀库存和已抢用户集合；Redis 初始化失败只记录日志，不回滚 MySQL。
+      operationId: adminCreateCoupon
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCouponCreateRequest'
+            example:
+              title: 满100减50
+              stock: 100
+              startTime: "2026-05-01 10:00:00"
+              endTime: "2026-05-01 12:00:00"
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminCouponCreateResponse'
+              example:
+                code: 1
+                msg: success
+                data:
+                  couponId: 1
+                  message: 创建成功
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /coupon/list:
+    get:
+      tags: [Coupon]
+      summary: 查询优惠券列表
+      operationId: listCoupons
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [0, 1]
+          description: 状态：0禁用，1启用；不传查询全部。
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 优惠券分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CouponPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /coupon/detail:
+    get:
+      tags: [Coupon]
+      summary: 查询优惠券详情
+      operationId: getCouponDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: couponId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 优惠券详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Coupon'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /coupon/seckill/preDeduct:
+    post:
+      tags: [Coupon]
+      summary: Redis Lua 秒杀预扣
+      description: |
+        Redis Lua 预扣成功后立即推送 PROCESSING，然后发送 RocketMQ 事务半消息到 coupon_seckill_tx。
+        本地事务提交后，Consumer 只消费已提交消息并通过 WebSocket 推送 SUCCESS。
+        发送失败、本地事务回滚或 Redis 补偿后会推送 FAILED。
+
+        返回码 data：
+        - 0 成功
+        - 1 未开始
+        - 2 已结束
+        - 3 库存不足
+        - 4 重复抢券
+
+        需要提前初始化 Redis 库存：
+        coupon:seckill:stock:{couponId}
+      operationId: seckillCouponPreDeduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponSeckillRequest'
+            example:
+              couponId: 1
+      responses:
+        '200':
+          description: Lua 预扣结果码
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        type: integer
+                        enum: [0, 1, 2, 3, 4]
+              example:
+                code: 1
+                msg: success
+                data: 0
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /coupon/order/status:
+    get:
+      tags: [Coupon]
+      summary: 查询当前用户抢券状态
+      operationId: getCouponOrderStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: couponId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 抢券订单状态；未抢券时 data 为 null。
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CouponOrderStatus'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
   /ws/{userId}:
     get:
       tags: [WebSocket]
@@ -1184,6 +1402,9 @@ paths:
 
         Kafka Consumer 推送在线粉丝时，消息示例：
         {"type":"NEW_VIDEO","videoId":1,"authorId":2,"createdAt":1777440000000,"content":"你关注的用户发布了新视频"}
+
+        优惠券秒杀结果推送示例：
+        {"type":"COUPON_SECKILL_RESULT","status":"SUCCESS","couponId":1,"couponCode":"CPN-XXXX-XXXX-XXXX-XXXX","message":"抢券成功"}
       operationId: websocketNotification
       parameters:
         - name: Authorization
@@ -1385,6 +1606,113 @@ components:
           format: int64
           example: 1777440000000
           description: 视频发布时间戳，毫秒；不传默认 System.currentTimeMillis()。
+
+    AdminCouponCreateRequest:
+      type: object
+      required: [title, stock, startTime, endTime]
+      properties:
+        title:
+          type: string
+          example: 满100减50
+        stock:
+          type: integer
+          minimum: 1
+          example: 100
+        startTime:
+          type: string
+          example: "2026-05-01 10:00:00"
+        endTime:
+          type: string
+          example: "2026-05-01 12:00:00"
+
+    AdminCouponCreateResponse:
+      type: object
+      properties:
+        couponId:
+          type: integer
+          format: int64
+          example: 1
+        message:
+          type: string
+          example: 创建成功
+
+    CouponSeckillRequest:
+      type: object
+      properties:
+        couponId:
+          type: integer
+          format: int64
+          example: 1
+      required: [couponId]
+
+    Coupon:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        stock:
+          type: integer
+        startTime:
+          type: string
+          example: "2026-04-30 10:00:00"
+        endTime:
+          type: string
+          example: "2026-04-30 12:00:00"
+        status:
+          type: integer
+          description: 0禁用，1启用
+        createTime:
+          type: string
+        updateTime:
+          type: string
+
+    CouponOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        couponId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        couponCode:
+          type: string
+        status:
+          type: integer
+          description: 0待发放，1已发放，2失败，3已使用，4已取消
+        createTime:
+          type: string
+
+    CouponOrderStatus:
+      type: object
+      properties:
+        couponId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        status:
+          type: integer
+        couponCode:
+          type: string
+
+    CouponPageResult:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/Coupon'
 
     PageResult:
       type: object
