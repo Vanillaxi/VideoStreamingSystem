@@ -3,6 +3,7 @@ package com.video.service.impl;
 import com.alibaba.csp.sentinel.Entry;
 import com.alibaba.csp.sentinel.EntryType;
 import com.alibaba.csp.sentinel.SphU;
+import com.alibaba.csp.sentinel.Tracer;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.alibaba.csp.sentinel.slots.block.degrade.DegradeException;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowException;
@@ -106,6 +107,7 @@ public class CouponServiceImpl implements CouponService {
     public Long seckillPreDeduct(CouponSeckillRequest request) {
         Long couponId = request == null ? null : request.getCouponId();
         try (Entry ignored = SphU.entry(SentinelRuleManager.COUPON_SECKILL_PRE_DEDUCT, EntryType.IN, 1, couponId)) {
+            applySentinelDegradeTestSwitch(couponId);
             return doSeckillPreDeduct(request);
         } catch (ParamFlowException e) {
             log.warn("触发 Sentinel 热点参数限流, couponId={}", couponId);
@@ -119,6 +121,29 @@ public class CouponServiceImpl implements CouponService {
         } catch (BlockException e) {
             log.warn("触发 Sentinel 规则拦截, resource={}", SentinelRuleManager.COUPON_SECKILL_PRE_DEDUCT);
             throw new BusinessException("系统繁忙，请稍后再试");
+        }
+    }
+
+    private void applySentinelDegradeTestSwitch(Long couponId) {
+        if (couponId == null) {
+            return;
+        }
+        if (couponId == 901L) {
+            log.warn("couponId=901 模拟慢调用");
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                RuntimeException exception = new RuntimeException("模拟慢调用被中断", e);
+                Tracer.trace(exception);
+                throw exception;
+            }
+        }
+        if (couponId == 902L) {
+            log.warn("couponId=902 模拟异常");
+            RuntimeException exception = new RuntimeException("模拟秒杀异常");
+            Tracer.trace(exception);
+            throw exception;
         }
     }
 

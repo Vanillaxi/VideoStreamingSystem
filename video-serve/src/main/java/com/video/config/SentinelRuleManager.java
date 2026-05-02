@@ -1,6 +1,8 @@
 package com.video.config;
 
 import com.alibaba.csp.sentinel.slots.block.RuleConstant;
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRule;
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRuleManager;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowRule;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowRuleManager;
 import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowItem;
@@ -22,6 +24,7 @@ public class SentinelRuleManager {
     public static void init() {
         initFlowRules();
         initHotParamRules();
+        initDegradeRules();
     }
 
     private static void initFlowRules() {
@@ -49,6 +52,30 @@ public class SentinelRuleManager {
 
         ParamFlowRuleManager.loadRules(Collections.singletonList(rule));
         log.info("Sentinel 热点参数规则初始化完成，resource={}, paramIdx=0, defaultQps=100, couponId=5 qps=20",
+                COUPON_SECKILL_PRE_DEDUCT);
+    }
+
+    private static void initDegradeRules() {
+        DegradeRule slowCallRule = new DegradeRule(COUPON_SECKILL_PRE_DEDUCT)
+                .setGrade(RuleConstant.DEGRADE_GRADE_RT)
+                .setCount(300)
+                .setSlowRatioThreshold(0.5)
+                .setMinRequestAmount(5)
+                .setStatIntervalMs(1000)
+                .setTimeWindow(10);
+
+        DegradeRule exceptionRule = new DegradeRule(COUPON_SECKILL_PRE_DEDUCT)
+                .setGrade(RuleConstant.DEGRADE_GRADE_EXCEPTION_RATIO)
+                .setCount(0.5)
+                .setMinRequestAmount(5)
+                .setStatIntervalMs(1000)
+                .setTimeWindow(10);
+
+        List<DegradeRule> rules = new ArrayList<>();
+        rules.add(slowCallRule);
+        rules.add(exceptionRule);
+        DegradeRuleManager.loadRules(rules);
+        log.info("Sentinel 熔断降级规则初始化完成，resource={}, slowRt=300ms, slowRatio=0.5, exceptionRatio=0.5, minRequest=5, timeWindow=10s",
                 COUPON_SECKILL_PRE_DEDUCT);
     }
 }
