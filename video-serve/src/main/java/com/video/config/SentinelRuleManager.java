@@ -1,81 +1,86 @@
 package com.video.config;
 
-import com.alibaba.csp.sentinel.slots.block.RuleConstant;
+import com.alibaba.csp.sentinel.datasource.Converter;
+import com.alibaba.csp.sentinel.datasource.ReadableDataSource;
+import com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource;
 import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRule;
 import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRuleManager;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowRule;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowRuleManager;
-import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowItem;
 import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowRule;
 import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowRuleManager;
+import com.alibaba.fastjson.JSON;
+import com.video.utils.AppProperties;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Slf4j
 public class SentinelRuleManager {
     public static final String COUPON_SECKILL_PRE_DEDUCT = "coupon_seckill_pre_deduct";
+    private static final String DEFAULT_SERVER_ADDR = "localhost:8848";
+    private static final String DEFAULT_GROUP_ID = "DEFAULT_GROUP";
+    private static final String DEFAULT_FLOW_DATA_ID = "video-system-flow-rules";
+    private static final String DEFAULT_PARAM_FLOW_DATA_ID = "video-system-param-flow-rules";
+    private static final String DEFAULT_DEGRADE_DATA_ID = "video-system-degrade-rules";
 
     private SentinelRuleManager() {
     }
 
     public static void init() {
-        initFlowRules();
-        initHotParamRules();
-        initDegradeRules();
+        initNacosRules();
     }
 
-    private static void initFlowRules() {
-        FlowRule rule = new FlowRule();
-        rule.setResource(COUPON_SECKILL_PRE_DEDUCT);
-        rule.setGrade(RuleConstant.FLOW_GRADE_QPS);
-        rule.setCount(100);
-        FlowRuleManager.loadRules(Collections.singletonList(rule));
-        log.info("Sentinel 规则初始化完成，resource={}, qps={}", COUPON_SECKILL_PRE_DEDUCT, 100);
+    private static void initNacosRules() {
+        String serverAddr = AppProperties.getProperty("nacos.serverAddr", DEFAULT_SERVER_ADDR);
+        String groupId = AppProperties.getProperty("sentinel.nacos.group", DEFAULT_GROUP_ID);
+        initNacosFlowRules(serverAddr, groupId,
+                AppProperties.getProperty("sentinel.nacos.flowDataId", DEFAULT_FLOW_DATA_ID));
+        initNacosHotParamRules(serverAddr, groupId,
+                AppProperties.getProperty("sentinel.nacos.paramFlowDataId", DEFAULT_PARAM_FLOW_DATA_ID));
+        initNacosDegradeRules(serverAddr, groupId,
+                AppProperties.getProperty("sentinel.nacos.degradeDataId", DEFAULT_DEGRADE_DATA_ID));
     }
 
-    private static void initHotParamRules() {
-        ParamFlowRule rule = new ParamFlowRule(COUPON_SECKILL_PRE_DEDUCT);
-        rule.setParamIdx(0);
-        rule.setCount(100);
-
-        ParamFlowItem couponFiveRule = new ParamFlowItem();
-        couponFiveRule.setObject("5");
-        couponFiveRule.setClassType(Long.class.getName());
-        couponFiveRule.setCount(20);
-
-        List<ParamFlowItem> items = new ArrayList<>();
-        items.add(couponFiveRule);
-        rule.setParamFlowItemList(items);
-
-        ParamFlowRuleManager.loadRules(Collections.singletonList(rule));
-        log.info("Sentinel 热点参数规则初始化完成，resource={}, paramIdx=0, defaultQps=100, couponId=5 qps=20",
-                COUPON_SECKILL_PRE_DEDUCT);
+    private static void initNacosFlowRules(String serverAddr, String groupId, String dataId) {
+        try {
+            Converter<String, List<FlowRule>> parser = source -> JSON.parseArray(source, FlowRule.class);
+            ReadableDataSource<String, List<FlowRule>> dataSource = new NacosDataSource<>(serverAddr, groupId, dataId, parser);
+            FlowRuleManager.register2Property(dataSource.getProperty());
+            log.info("Sentinel Nacos 流控规则数据源初始化成功，serverAddr={}, groupId={}, dataId={}",
+                    serverAddr, groupId, dataId);
+        } catch (Exception e) {
+            log.error("Sentinel Nacos 流控规则数据源初始化失败，serverAddr={}, groupId={}, dataId={}",
+                    serverAddr, groupId, dataId, e);
+            throw e;
+        }
     }
 
-    private static void initDegradeRules() {
-        DegradeRule slowCallRule = new DegradeRule(COUPON_SECKILL_PRE_DEDUCT)
-                .setGrade(RuleConstant.DEGRADE_GRADE_RT)
-                .setCount(300)
-                .setSlowRatioThreshold(0.5)
-                .setMinRequestAmount(5)
-                .setStatIntervalMs(1000)
-                .setTimeWindow(10);
+    private static void initNacosHotParamRules(String serverAddr, String groupId, String dataId) {
+        try {
+            Converter<String, List<ParamFlowRule>> parser = source -> JSON.parseArray(source, ParamFlowRule.class);
+            ReadableDataSource<String, List<ParamFlowRule>> dataSource = new NacosDataSource<>(serverAddr, groupId, dataId, parser);
+            ParamFlowRuleManager.register2Property(dataSource.getProperty());
+            log.info("Sentinel Nacos 热点参数规则数据源初始化成功，serverAddr={}, groupId={}, dataId={}",
+                    serverAddr, groupId, dataId);
+        } catch (Exception e) {
+            log.error("Sentinel Nacos 热点参数规则数据源初始化失败，serverAddr={}, groupId={}, dataId={}",
+                    serverAddr, groupId, dataId, e);
+            throw e;
+        }
+    }
 
-        DegradeRule exceptionRule = new DegradeRule(COUPON_SECKILL_PRE_DEDUCT)
-                .setGrade(RuleConstant.DEGRADE_GRADE_EXCEPTION_RATIO)
-                .setCount(0.5)
-                .setMinRequestAmount(5)
-                .setStatIntervalMs(1000)
-                .setTimeWindow(10);
-
-        List<DegradeRule> rules = new ArrayList<>();
-        rules.add(slowCallRule);
-        rules.add(exceptionRule);
-        DegradeRuleManager.loadRules(rules);
-        log.info("Sentinel 熔断降级规则初始化完成，resource={}, slowRt=300ms, slowRatio=0.5, exceptionRatio=0.5, minRequest=5, timeWindow=10s",
-                COUPON_SECKILL_PRE_DEDUCT);
+    private static void initNacosDegradeRules(String serverAddr, String groupId, String dataId) {
+        try {
+            Converter<String, List<DegradeRule>> parser = source -> JSON.parseArray(source, DegradeRule.class);
+            ReadableDataSource<String, List<DegradeRule>> dataSource = new NacosDataSource<>(serverAddr, groupId, dataId, parser);
+            DegradeRuleManager.register2Property(dataSource.getProperty());
+            log.info("Sentinel Nacos 熔断规则数据源初始化成功，serverAddr={}, groupId={}, dataId={}",
+                    serverAddr, groupId, dataId);
+        } catch (Exception e) {
+            log.error("Sentinel Nacos 熔断规则数据源初始化失败，serverAddr={}, groupId={}, dataId={}",
+                    serverAddr, groupId, dataId, e);
+            throw e;
+        }
     }
 }

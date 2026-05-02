@@ -105,6 +105,12 @@ rocketmq.topic.couponSeckillTx=coupon_seckill_tx
 rocketmq.producerGroup.couponSeckillTx=coupon_seckill_tx_producer_group
 rocketmq.consumerGroup.couponSeckillTx=coupon_seckill_tx_consumer_group
 rocketmq.consumerMaxReconsumeTimes.couponSeckillTx=16
+
+nacos.serverAddr=localhost:8848
+sentinel.nacos.group=SENTINEL_GROUP
+sentinel.nacos.flowDataId=video-system-flow-rules
+sentinel.nacos.paramFlowDataId=video-system-param-flow-rules
+sentinel.nacos.degradeDataId=video-system-degrade-rules
 ```
 
 AccessKey 从环境变量读取，不要写进配置文件：
@@ -247,7 +253,91 @@ Redis Lua 预扣
 coupon_seckill_pre_deduct
 ```
 
-当前规则：
+当前规则从 Nacos 拉取，项目启动时注册 Sentinel Nacos DataSource。代码里不再硬编码调用
+`FlowRuleManager.loadRules`、`ParamFlowRuleManager.loadRules`、`DegradeRuleManager.loadRules`。
+
+新增 Maven 依赖：
+
+```xml
+<dependency>
+    <groupId>com.alibaba.csp</groupId>
+    <artifactId>sentinel-datasource-nacos</artifactId>
+    <version>1.8.6</version>
+</dependency>
+```
+
+Nacos 配置项：
+
+```properties
+nacos.serverAddr=localhost:8848
+sentinel.nacos.group=SENTINEL_GROUP
+sentinel.nacos.flowDataId=video-system-flow-rules
+sentinel.nacos.paramFlowDataId=video-system-param-flow-rules
+sentinel.nacos.degradeDataId=video-system-degrade-rules
+```
+
+建议在 Nacos 中创建以下 JSON 配置。
+
+`video-system-flow-rules`：
+
+```json
+[
+  {
+    "resource": "coupon_seckill_pre_deduct",
+    "grade": 1,
+    "count": 100,
+    "limitApp": "default",
+    "strategy": 0,
+    "controlBehavior": 0
+  }
+]
+```
+
+`video-system-param-flow-rules`：
+
+```json
+[
+  {
+    "resource": "coupon_seckill_pre_deduct",
+    "paramIdx": 0,
+    "count": 100,
+    "durationInSec": 1,
+    "paramFlowItemList": [
+      {
+        "object": "5",
+        "classType": "java.lang.Long",
+        "count": 20
+      }
+    ]
+  }
+]
+```
+
+`video-system-degrade-rules`：
+
+```json
+[
+  {
+    "resource": "coupon_seckill_pre_deduct",
+    "grade": 0,
+    "count": 300,
+    "timeWindow": 10,
+    "minRequestAmount": 5,
+    "slowRatioThreshold": 0.5,
+    "statIntervalMs": 1000
+  },
+  {
+    "resource": "coupon_seckill_pre_deduct",
+    "grade": 1,
+    "count": 0.5,
+    "timeWindow": 10,
+    "minRequestAmount": 5,
+    "statIntervalMs": 1000
+  }
+]
+```
+
+规则含义：
 
 | 类型 | 规则 | 返回信息 |
 | --- | --- | --- |
