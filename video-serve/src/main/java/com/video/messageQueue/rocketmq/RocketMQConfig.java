@@ -1,13 +1,12 @@
 package com.video.messageQueue.rocketmq;
 
+import com.video.utils.AppProperties;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.InputStream;
 import java.util.Properties;
 
 @Slf4j
 public class RocketMQConfig {
-    private static final String CONFIG_FILE = "properties/RocketMQ.properties";
     private static final Properties PROPERTIES = loadConfig();
 
     private RocketMQConfig() {
@@ -34,16 +33,6 @@ public class RocketMQConfig {
     }
 
     private static Properties loadConfig() {
-        Properties properties = new Properties();
-        try (InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIG_FILE)) {
-            if (inputStream != null) {
-                properties.load(inputStream);
-            } else {
-                log.warn("未找到 RocketMQ 配置文件 {}，使用默认配置", CONFIG_FILE);
-            }
-        } catch (Exception e) {
-            log.warn("读取 RocketMQ 配置失败，使用默认配置", e);
-        }
-        return properties;
+        return AppProperties.getProperties();
     }
 }

@@ -1,7 +1,15 @@
 package com.video.service.impl;
 
+import com.alibaba.csp.sentinel.Entry;
+import com.alibaba.csp.sentinel.EntryType;
+import com.alibaba.csp.sentinel.SphU;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeException;
+import com.alibaba.csp.sentinel.slots.block.flow.FlowException;
+import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowException;
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
+import com.video.config.SentinelRuleManager;
 import com.video.exception.BusinessException;
 import com.video.mapper.CouponMapper;
 import com.video.mapper.CouponOrderMapper;
@@ -96,6 +104,25 @@ public class CouponServiceImpl implements CouponService {
 
     @Override
     public Long seckillPreDeduct(CouponSeckillRequest request) {
+        Long couponId = request == null ? null : request.getCouponId();
+        try (Entry ignored = SphU.entry(SentinelRuleManager.COUPON_SECKILL_PRE_DEDUCT, EntryType.IN, 1, couponId)) {
+            return doSeckillPreDeduct(request);
+        } catch (ParamFlowException e) {
+            log.warn("触发 Sentinel 热点参数限流, couponId={}", couponId);
+            throw new BusinessException("当前优惠券过于火爆，请稍后再试");
+        } catch (FlowException e) {
+            log.warn("触发 Sentinel 普通限流, resource={}", SentinelRuleManager.COUPON_SECKILL_PRE_DEDUCT);
+            throw new BusinessException("系统繁忙，请稍后再试");
+        } catch (DegradeException e) {
+            log.warn("触发 Sentinel 熔断降级, resource={}", SentinelRuleManager.COUPON_SECKILL_PRE_DEDUCT);
+            throw new BusinessException("服务暂时不可用，请稍后再试");
+        } catch (BlockException e) {
+            log.warn("触发 Sentinel 规则拦截, resource={}", SentinelRuleManager.COUPON_SECKILL_PRE_DEDUCT);
+            throw new BusinessException("系统繁忙，请稍后再试");
+        }
+    }
+
+    private Long doSeckillPreDeduct(CouponSeckillRequest request) {
         if (request == null || request.getCouponId() == null) {
             throw new BusinessException(400, "优惠券ID不能为空");
         }

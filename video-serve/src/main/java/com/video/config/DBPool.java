@@ -1,8 +1,8 @@
 package com.video.config;
 
+import com.video.utils.AppProperties;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -18,11 +18,8 @@ public class DBPool {
     private static volatile boolean shutdown = false;
 
     static {
-        try (InputStream is = DBPool.class.getClassLoader().getResourceAsStream("properties/DB.properties")) {
-            if (is == null) {
-                throw new IllegalStateException("properties/DB.properties not found");
-            }
-            props.load(is);
+        try {
+            props.putAll(AppProperties.getProperties());
 
             Class.forName("com.mysql.cj.jdbc.Driver");
 

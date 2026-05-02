@@ -5,6 +5,7 @@ import com.video.pojo.dto.RealtimeFeedMessage;
 import com.video.pojo.dto.VideoPublishedEvent;
 import com.video.pojo.entity.UserFollow;
 import com.video.proxy.BeanFactory;
+import com.video.utils.AppProperties;
 import com.video.utils.JSONUtil;
 import com.video.utils.RedisUtil;
 import com.video.websocket.NotificationWebSocketServer;
@@ -15,7 +16,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
-import java.io.InputStream;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 public class VideoPublishConsumer {
-    private static final String CONFIG_FILE = "properties/Kafka.properties";
     private static final String DEFAULT_TOPIC = "video_publish";
     private static final String FEED_PREFIX = "feed:user:";
     private static final String FOLLOWER_PREFIX = "follower:";
@@ -205,14 +204,6 @@ public class VideoPublishConsumer {
     }
 
     private static Properties loadConfig() {
-        Properties properties = new Properties();
-        try (InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIG_FILE)) {
-            if (inputStream != null) {
-                properties.load(inputStream);
-            }
-        } catch (Exception e) {
-            log.warn("读取 Kafka 配置失败，使用默认配置", e);
-        }
-        return properties;
+        return AppProperties.getProperties();
     }
 }

@@ -4,12 +4,10 @@ import lombok.extern.slf4j.Slf4j;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
-import java.util.Properties;
 
 @Slf4j
 public class CouponCodeUtil {
@@ -67,14 +65,8 @@ public class CouponCodeUtil {
     }
 
     private static String loadSecret() {
-        try (InputStream input = CouponCodeUtil.class.getClassLoader()
-                .getResourceAsStream("properties/JWT.properties")) {
-            if (input == null) {
-                return "coupon-code-default-secret";
-            }
-            Properties properties = new Properties();
-            properties.load(input);
-            return properties.getProperty("jwt.secret", "coupon-code-default-secret");
+        try {
+            return AppProperties.getProperty("jwt.secret", "coupon-code-default-secret");
         } catch (Exception e) {
             log.warn("读取券码 HMAC secret 失败，使用默认 secret", e);
             return "coupon-code-default-secret";

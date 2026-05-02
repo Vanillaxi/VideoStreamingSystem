@@ -27,7 +27,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public class OssClientUtil {
-    private static final String CONFIG_FILE = "properties/OSS.properties";
     private static final String ACCESS_KEY_ID_ENV = "OSS_ACCESS_KEY_ID";
     private static final String ACCESS_KEY_SECRET_ENV = "OSS_ACCESS_KEY_SECRET";
     private static final long MAX_VIDEO_SIZE = 500L * 1024 * 1024;
@@ -276,14 +275,7 @@ public class OssClientUtil {
     }
 
     private static OssConfig loadConfig() {
-        Properties properties = new Properties();
-        try (InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIG_FILE)) {
-            if (inputStream != null) {
-                properties.load(inputStream);
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("读取 OSS 配置失败", e);
-        }
+        Properties properties = AppProperties.getProperties();
 
         String endpoint = getRequired(properties, "oss.endpoint", "OSS_ENDPOINT");
         String bucketName = getRequired(properties, "oss.bucket", "OSS_BUCKET");

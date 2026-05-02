@@ -1,6 +1,7 @@
 package com.video.messageQueue.kafka;
 
 import com.video.pojo.dto.VideoPublishedEvent;
+import com.video.utils.AppProperties;
 import com.video.utils.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -8,13 +9,11 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
-import java.io.InputStream;
 import java.time.Duration;
 import java.util.Properties;
 
 @Slf4j
 public class KafkaProducerUtil {
-    private static final String CONFIG_FILE = "properties/Kafka.properties";
     private static final String DEFAULT_TOPIC = "video_publish";
     private static volatile KafkaProducer<String, String> producer;
     private static final Properties config = loadConfig();
@@ -73,14 +72,6 @@ public class KafkaProducerUtil {
     }
 
     private static Properties loadConfig() {
-        Properties properties = new Properties();
-        try (InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIG_FILE)) {
-            if (inputStream != null) {
-                properties.load(inputStream);
-            }
-        } catch (Exception e) {
-            log.warn("读取 Kafka 配置失败，使用默认配置", e);
-        }
-        return properties;
+        return AppProperties.getProperties();
     }
 }

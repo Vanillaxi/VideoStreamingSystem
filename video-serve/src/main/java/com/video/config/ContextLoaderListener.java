@@ -33,6 +33,7 @@ public class ContextLoaderListener implements ServletContextListener {
         log.info(">>> 正在启动视频系统 Web 容器 <<<");
         try {
             BeanFactory.init();
+            SentinelRuleManager.init();
             VideoViewCountFlushTask.start();
             VideoPublishConsumer.start();
             CouponSeckillTxConsumer.start();

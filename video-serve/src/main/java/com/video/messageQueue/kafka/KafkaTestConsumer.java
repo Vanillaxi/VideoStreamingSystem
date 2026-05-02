@@ -1,5 +1,6 @@
 package com.video.messageQueue.kafka;
 
+import com.video.utils.AppProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -7,7 +8,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
-import java.io.InputStream;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
@@ -18,7 +18,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class KafkaTestConsumer {
-    private static final String CONFIG_FILE = "properties/Kafka.properties";
     private static final String DEFAULT_TOPIC = "video_publish";
     private static final String TEST_GROUP_ID = "video-kafka-test-group";
     private static final AtomicBoolean STARTED = new AtomicBoolean(false);
@@ -108,14 +107,6 @@ public class KafkaTestConsumer {
     }
 
     private static Properties loadConfig() {
-        Properties properties = new Properties();
-        try (InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIG_FILE)) {
-            if (inputStream != null) {
-                properties.load(inputStream);
-            }
-        } catch (Exception e) {
-            log.warn("读取 Kafka 测试配置失败，使用默认配置", e);
-        }
-        return properties;
+        return AppProperties.getProperties();
     }
 }

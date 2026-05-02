@@ -1,0 +1,31 @@
+db.url=jdbc:mysql://localhost:3306/video?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+db.username=root
+db.password=your_password
+
+redis.host=localhost
+redis.port=6379
+redis.password=your_password
+redis.database=1
+redis.maxTotal=20
+redis.maxIdle=10
+
+jwt.secret=replace_with_a_long_random_secret_at_least_32_bytes
+jwt.ttl=3600000
+jwt.tokenName=token
+
+oss.endpoint=oss-cn-hangzhou.aliyuncs.com
+oss.bucket=video-streaming-system
+oss.domain=https://video-streaming-system.oss-cn-hangzhou.aliyuncs.com
+# AccessKey 从环境变量读取，不要写入配置文件：
+# OSS_ACCESS_KEY_ID
+# OSS_ACCESS_KEY_SECRET
+
+kafka.bootstrap.servers=localhost:9092
+kafka.video.publish.topic=video_publish
+kafka.video.publish.group.id=video-feed-push-group
+
+rocketmq.namesrvAddr=localhost:9876
+rocketmq.topic.couponSeckillTx=coupon_seckill_tx
+rocketmq.producerGroup.couponSeckillTx=coupon_seckill_tx_producer_group
+rocketmq.consumerGroup.couponSeckillTx=coupon_seckill_tx_consumer_group
+rocketmq.consumerMaxReconsumeTimes.couponSeckillTx=16

@@ -1,3 +1,0 @@
-jwt.secret=密钥
-jwt.ttl=3600000
-jwt.tokenName= 你的名字

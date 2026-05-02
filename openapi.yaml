@@ -22,6 +22,12 @@ info:
     - video_publish：Kafka，视频发布后写入粉丝 Feed。
     - coupon_seckill_tx：RocketMQ 事务消息，Redis Lua 预扣成功后执行本地事务创建 coupon_order。
     - message_outbox 表结构暂时保留，但秒杀主链路不再写入、不再读取。
+
+    Sentinel 说明：
+    - 秒杀入口资源名：coupon_seckill_pre_deduct
+    - 普通 QPS 限流：系统繁忙，请稍后再试
+    - 热点参数限流：当前优惠券过于火爆，请稍后再试
+    - 熔断降级：服务暂时不可用，请稍后再试
 servers:
   - url: http://localhost:8080/video-serve
     description: Local Tomcat
@@ -1299,12 +1305,18 @@ paths:
         本地事务提交后，Consumer 只消费已提交消息并通过 WebSocket 推送 SUCCESS。
         发送失败、本地事务回滚或 Redis 补偿后会推送 FAILED。
 
-        返回码 data：
-        - 0 成功
-        - 1 未开始
-        - 2 已结束
-        - 3 库存不足
-        - 4 重复抢券
+        业务成功时 data 返回文字：
+        - 抢券请求已受理
+        - 秒杀未开始
+        - 秒杀已结束
+        - 库存不足
+        - 不能重复抢券
+
+        Sentinel：
+        - 资源名：coupon_seckill_pre_deduct
+        - 普通限流：{"code":0,"msg":"系统繁忙，请稍后再试","data":null}
+        - 热点参数限流：{"code":0,"msg":"当前优惠券过于火爆，请稍后再试","data":null}
+        - 熔断降级：{"code":0,"msg":"服务暂时不可用，请稍后再试","data":null}
 
         需要提前初始化 Redis 库存：
         coupon:seckill:stock:{couponId}
@@ -1323,7 +1335,7 @@ paths:
               couponId: 1
       responses:
         '200':
-          description: Lua 预扣结果码
+          description: Lua 预扣结果或 Sentinel 业务失败结果
           content:
             application/json:
               schema:
@@ -1332,12 +1344,39 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: integer
-                        enum: [0, 1, 2, 3, 4]
-              example:
-                code: 1
-                msg: success
-                data: 0
+                        type: string
+                        nullable: true
+                        enum:
+                          - 抢券请求已受理
+                          - 秒杀未开始
+                          - 秒杀已结束
+                          - 库存不足
+                          - 不能重复抢券
+              examples:
+                accepted:
+                  summary: 抢券请求已受理
+                  value:
+                    code: 1
+                    msg: success
+                    data: 抢券请求已受理
+                flowLimited:
+                  summary: Sentinel 普通限流
+                  value:
+                    code: 0
+                    msg: 系统繁忙，请稍后再试
+                    data: null
+                hotParamLimited:
+                  summary: Sentinel 热点参数限流
+                  value:
+                    code: 0
+                    msg: 当前优惠券过于火爆，请稍后再试
+                    data: null
+                degraded:
+                  summary: Sentinel 熔断降级
+                  value:
+                    code: 0
+                    msg: 服务暂时不可用，请稍后再试
+                    data: null
         '401':
           $ref: '#/components/responses/UnauthorizedResponse'
         default:

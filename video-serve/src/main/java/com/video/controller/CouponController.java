@@ -37,6 +37,9 @@ public class CouponController extends BaseController {
         if (result == null) {
             return "抢券失败";
         }
+        if (result == -1L) {
+            return "系统繁忙，请稍后再试";
+        }
         if (result == 0L) {
             return "抢券请求已受理";
         }

@@ -149,13 +149,16 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public void removeUser(Long userId) {
-        if(userMapper.getByUserId(userId) == null) {
+        User targetUser = userMapper.getByUserId(userId);
+        if(targetUser == null) {
             throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
+        User adminUser = getCurrentAdmin();
+        checkCanManageLowerRole(adminUser, targetUser);
         userMapper.delete(userId);
         String key = "user:cache:" + userId;
         RedisUtil.del(key);
-        log.info("用户 {} 账号注销成功，已清理缓存", userId);
+        log.info("管理员 {} 注销用户 {} 成功，已清理缓存", adminUser.getId(), userId);
     }
 
     /**
@@ -170,10 +173,49 @@ public class UserServiceImpl implements UserService {
         if(user==null){
             throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
-        Long adminId=UserHolder.getUser().getId();
-        user.setUpdateUser(userMapper.getByUserId(adminId).getUsername());
+        User adminUser = getCurrentAdmin();
+        checkCanManageLowerRole(adminUser, user);
+        checkTargetRoleLowerThanAdmin(adminUser, role);
+        user.setUpdateUser(adminUser.getUsername());
         user.setRole(role);
         userMapper.update(user);
+        log.info("管理员 {} 将用户 {} 权限调整为 {}", adminUser.getId(), userId, role);
+    }
+
+    private User getCurrentAdmin() {
+        User currentUser = UserHolder.getUser();
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new AuthException(ErrorCode.USER_NOT_LOGIN);
+        }
+        User adminUser = userMapper.getByUserId(currentUser.getId());
+        if (adminUser == null) {
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
+        }
+        return adminUser;
+    }
+
+    private void checkCanManageLowerRole(User adminUser, User targetUser) {
+        if (targetUser.getId() != null && targetUser.getId().equals(adminUser.getId())) {
+            throw new BusinessException(403, "不能操作自己的账号");
+        }
+        int adminRole = safeRole(adminUser.getRole());
+        int targetRole = safeRole(targetUser.getRole());
+        if (targetRole >= adminRole) {
+            throw new BusinessException(403, "只能操作比自己等级低的用户");
+        }
+    }
+
+    private void checkTargetRoleLowerThanAdmin(User adminUser, Integer targetRole) {
+        if (targetRole == null || targetRole < 0) {
+            throw new BusinessException(400, "目标权限等级不合法");
+        }
+        if (targetRole >= safeRole(adminUser.getRole())) {
+            throw new BusinessException(403, "只能将用户提权到低于自己的等级");
+        }
+    }
+
+    private int safeRole(Integer role) {
+        return role == null ? 0 : role;
     }
 
     /**

@@ -19,7 +19,7 @@ public class DBTest {
                 DBPool.releaseConnection(conn);
             }
         } catch (Exception e) {
-            System.err.println("MySQL 连接失败！请检查 DB.properties 配置或数据库是否启动。");
+            System.err.println("MySQL 连接失败！请检查 application.properties 配置或数据库是否启动。");
             e.printStackTrace();
         }
     }

@@ -74,70 +74,50 @@ video-serve/src/main/java/com/video
 video-serve/src/main/resources/properties/
 ```
 
-请参考 `.example` 文件创建本地配置。
-
-### DB.properties
+请参考 `application.properties.example` 创建本地配置：
 
 ```properties
 db.url=jdbc:mysql://localhost:3306/video?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
 db.username=root
 db.password=your_password
-```
 
-### Redis.properties
-
-```properties
 redis.host=localhost
 redis.port=6379
 redis.password=
 redis.database=0
 redis.maxTotal=20
 redis.maxIdle=10
-```
 
-### JWT.properties
-
-当前 token 过期时间为 1 小时：
-
-```properties
 jwt.secret=your_very_long_secret
 jwt.ttl=3600000
 jwt.tokenName=token
-```
 
-### OSS.properties
-
-AccessKey 从环境变量读取，不要写进配置文件：
-
-```properties
 oss.endpoint=oss-cn-hangzhou.aliyuncs.com
 oss.bucket=video-streaming-system
 oss.domain=https://video-streaming-system.oss-cn-hangzhou.aliyuncs.com
+
+kafka.bootstrap.servers=localhost:9092
+kafka.video.publish.topic=video_publish
+kafka.video.publish.group.id=video-feed-push-group
+
+rocketmq.namesrvAddr=localhost:9876
+rocketmq.topic.couponSeckillTx=coupon_seckill_tx
+rocketmq.producerGroup.couponSeckillTx=coupon_seckill_tx_producer_group
+rocketmq.consumerGroup.couponSeckillTx=coupon_seckill_tx_consumer_group
+rocketmq.consumerMaxReconsumeTimes.couponSeckillTx=16
 ```
 
-本地环境变量：
+AccessKey 从环境变量读取，不要写进配置文件：
 
 ```bash
 export OSS_ACCESS_KEY_ID=your_access_key_id
 export OSS_ACCESS_KEY_SECRET=your_access_key_secret
 ```
 
-### Kafka.properties
+当前 token 过期时间为 1 小时：
 
 ```properties
-kafka.bootstrap.servers=localhost:9092
-kafka.video.publish.topic=video_publish
-kafka.video.publish.group.id=video-feed-push-group
-```
-
-### RocketMQ.properties
-
-```properties
-rocketmq.namesrvAddr=localhost:9876
-rocketmq.topic.couponSeckillTx=coupon_seckill_tx
-rocketmq.producerGroup.couponSeckillTx=coupon_seckill_tx_producer_group
-rocketmq.consumerGroup.couponSeckillTx=coupon_seckill_tx_consumer_group
-rocketmq.consumerMaxReconsumeTimes.couponSeckillTx=16
+jwt.ttl=3600000
 ```
 
 ## 数据库
@@ -258,6 +238,29 @@ Redis Lua 预扣
 ```
 
 如果 Redis 预扣成功后事务消息发送失败、本地事务回滚或事务回查确认失败，会执行 Redis 补偿；补偿失败会写入 `coupon_seckill_fail`，便于后续人工处理。
+
+## Sentinel
+
+秒杀入口 `/coupon/seckill/preDeduct` 使用 Sentinel 保护，资源名固定为：
+
+```text
+coupon_seckill_pre_deduct
+```
+
+当前规则：
+
+| 类型 | 规则 | 返回信息 |
+| --- | --- | --- |
+| 普通 QPS 限流 | QPS=100 | `系统繁忙，请稍后再试` |
+| 热点参数限流 | 按 `couponId` 限流，默认 QPS=100 | `当前优惠券过于火爆，请稍后再试` |
+| 热点参数限流特殊值 | `couponId=5`，QPS=20 | `当前优惠券过于火爆，请稍后再试` |
+| 熔断降级 | Sentinel 降级规则触发时 | `服务暂时不可用，请稍后再试` |
+
+限流或降级时不执行 Redis Lua，也不会发送 RocketMQ 事务消息，接口统一返回：
+
+```json
+{"code":0,"msg":"对应错误信息","data":null}
+```
 
 ## 热度计算
 
@@ -388,6 +391,12 @@ GET  /coupon/order/status?couponId=
 
 `/coupon/seckill/preDeduct` 是当前唯一抢券入口，使用 Redis Lua 预扣 + RocketMQ 事务消息。
 
+该接口已接入 Sentinel：
+
+- 普通限流：`系统繁忙，请稍后再试`
+- 热点参数限流：`当前优惠券过于火爆，请稍后再试`
+- 熔断降级：`服务暂时不可用，请稍后再试`
+
 ### WebSocket
 
 ```text
@@ -475,7 +484,7 @@ sh bin/mqadmin updateTopic -n localhost:9876 -c DefaultCluster -t coupon_seckill
 3. 复制并配置：
 
 ```text
-video-serve/src/main/resources/properties/RocketMQ.properties
+video-serve/src/main/resources/properties/application.properties
 ```
 
 4. 启动 Tomcat，连接 WebSocket：

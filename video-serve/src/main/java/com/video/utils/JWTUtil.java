@@ -4,7 +4,6 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.InputStream;
 import java.security.Key;
 import java.util.Date;
 import java.util.Properties;
@@ -18,22 +17,14 @@ public class JWTUtil {
 
     static {
         //获取配置信息
-        try (InputStream input = JWTUtil.class.getClassLoader()
-                .getResourceAsStream("properties/JWT.properties")) {
-            Properties props = new Properties();
-            if (input != null) {
-                //获取成功
-                props.load(input);
-                SECRET = props.getProperty("jwt.secret");
-                EXPIRE = Long.parseLong(props.getProperty("jwt.ttl"));
-                TOKEN_NAME = props.getProperty("jwt.tokenName");
-                log.info("JWT配置加载成功");
-            } else {
-                //获取失败
-                throw new RuntimeException("找不到JWT配置文件!");
-            }
+        try {
+            Properties props = AppProperties.getProperties();
+            SECRET = props.getProperty("jwt.secret");
+            EXPIRE = Long.parseLong(props.getProperty("jwt.ttl"));
+            TOKEN_NAME = props.getProperty("jwt.tokenName");
+            log.info("JWT配置加载成功");
         } catch (Exception e) {
-            log.error("JWT配置初始化失败！请检查 JWT.properties", e);//打印堆栈
+            log.error("JWT配置初始化失败！请检查 application.properties", e);//打印堆栈
         }
     }
 

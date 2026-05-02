@@ -1,7 +1,0 @@
-oss.endpoint=oss-cn-hangzhou.aliyuncs.com
-oss.bucket=video-streaming-system
-oss.domain=https://video-streaming-system.oss-cn-hangzhou.aliyuncs.com
-
-# AccessKey 从环境变量读取，不要写入配置文件：
-# OSS_ACCESS_KEY_ID
-# OSS_ACCESS_KEY_SECRET
