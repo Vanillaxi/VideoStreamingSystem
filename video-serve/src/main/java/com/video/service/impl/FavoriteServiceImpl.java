@@ -3,8 +3,11 @@ package com.video.service.impl;
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyComponent;
 import com.video.mapper.FavoriteMapper;
+import com.video.mapper.UserMapper;
 import com.video.mapper.VideoMapper;
 import com.video.pojo.dto.PageResult;
+import com.video.pojo.dto.VideoVO;
+import com.video.pojo.entity.User;
 import com.video.pojo.entity.Video;
 import com.video.pojo.entity.VideoFavorite;
 import com.video.service.FavoriteService;
@@ -33,6 +36,9 @@ public class FavoriteServiceImpl implements FavoriteService {
 
     @MyAutowired
     private VideoMapper videoMapper;
+
+    @MyAutowired
+    private UserMapper userMapper;
 
     /**
      * 收藏视频
@@ -117,15 +123,39 @@ public class FavoriteServiceImpl implements FavoriteService {
             videoMap.put(video.getId(), video);
         }
 
-        List<Video> orderedVideos = new ArrayList<>();
+        List<VideoVO> orderedVideos = new ArrayList<>();
         for (Long videoId : videoIds) {
             Video video = videoMap.get(videoId);
             if (video != null) {
-                orderedVideos.add(video);
+                orderedVideos.add(toVideoVO(video));
             }
         }
 
         return new PageResult(total == null ? 0L : total, orderedVideos);
+    }
+
+    private VideoVO toVideoVO(Video video) {
+        User author = video.getUserId() == null ? null : userMapper.getByUserId(video.getUserId());
+        VideoVO vo = new VideoVO();
+        vo.setId(video.getId());
+        vo.setTitle(video.getTitle());
+        vo.setDescription(video.getDescription());
+        vo.setCategoryId(video.getCategoryId());
+        vo.setUserId(video.getUserId());
+        vo.setAuthorId(video.getUserId());
+        vo.setAuthorNickname(author == null ? null : author.getNickname());
+        vo.setAuthorAvatarUrl(author == null ? null : author.getAvatarUrl());
+        vo.setVideoUrl(video.getVideoUrl());
+        vo.setSize(video.getSize());
+        vo.setStatus(video.getStatus());
+        vo.setLikesCount(video.getLikesCount());
+        vo.setCommentCount(video.getCommentCount());
+        vo.setFavoriteCount(video.getFavoriteCount());
+        vo.setViewCount(video.getViewCount());
+        vo.setHotScore(video.getHotScore());
+        vo.setCreateTime(video.getCreateTime());
+        vo.setUpdateTime(video.getUpdateTime());
+        return vo;
     }
 
     private void clearVideoCache(Long videoId, Long categoryId) {

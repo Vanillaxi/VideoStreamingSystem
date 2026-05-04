@@ -83,12 +83,38 @@ public class CouponServiceImpl implements CouponService {
      */
     @Override
     public PageResult<Coupon> list(Integer status, Integer page, Integer pageSize) {
+        return queryCouponPage(1, page, pageSize);
+    }
+
+    @Override
+    public PageResult<Coupon> listByAdmin(Integer status, Integer page, Integer pageSize) {
+        return queryCouponPage(status, page, pageSize);
+    }
+
+    private PageResult<Coupon> queryCouponPage(Integer status, Integer page, Integer pageSize) {
         int currentPage = page == null || page < 1 ? 1 : page;
         int currentPageSize = pageSize == null || pageSize < 1 ? 10 : pageSize;
         int offset = (currentPage - 1) * currentPageSize;
         List<Coupon> coupons = couponMapper.list(status, offset, currentPageSize);
         Long total = couponMapper.count(status);
         return new PageResult<>(total == null ? 0L : total, coupons);
+    }
+
+    @Override
+    public void disableByAdmin(Long couponId) {
+        if (couponId == null) {
+            throw new BusinessException(400, "优惠券ID不能为空");
+        }
+        Coupon coupon = couponMapper.getById(couponId);
+        if (coupon == null) {
+            throw new BusinessException(404, "优惠券不存在");
+        }
+        int rows = couponMapper.disable(couponId);
+        if (rows <= 0) {
+            throw new BusinessException("优惠券停用失败");
+        }
+        RedisUtil.del(stockKey(couponId));
+        RedisUtil.del(usersKey(couponId));
     }
 
     @Override

@@ -196,6 +196,7 @@ public abstract class BaseController extends HttpServlet {
     // 辅助方法：简单类型转换
     private Object convertBasicType(String value, Class<?> type) {
         if (value == null) return null;
+        if (value.isBlank()) return null;
         if (type == Integer.class || type == int.class) return Integer.parseInt(value);
         if (type == Long.class || type == long.class) return Long.parseLong(value);
         if (type == Double.class || type == double.class) return Double.parseDouble(value);

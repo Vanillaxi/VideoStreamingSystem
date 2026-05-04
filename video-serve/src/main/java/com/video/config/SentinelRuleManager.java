@@ -3,6 +3,7 @@ package com.video.config;
 import com.alibaba.csp.sentinel.datasource.Converter;
 import com.alibaba.csp.sentinel.datasource.ReadableDataSource;
 import com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource;
+import com.alibaba.csp.sentinel.slots.block.RuleConstant;
 import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRule;
 import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRuleManager;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowRule;
@@ -23,12 +24,60 @@ public class SentinelRuleManager {
     private static final String DEFAULT_FLOW_DATA_ID = "video-system-flow-rules";
     private static final String DEFAULT_PARAM_FLOW_DATA_ID = "video-system-param-flow-rules";
     private static final String DEFAULT_DEGRADE_DATA_ID = "video-system-degrade-rules";
+    private static final String NACOS_ENABLED_KEY = "sentinel.nacos.enabled";
 
     private SentinelRuleManager() {
     }
 
     public static void init() {
+        initLocalRules();
+
+        boolean nacosEnabled = Boolean.parseBoolean(AppProperties.getProperty(NACOS_ENABLED_KEY, "false"));
+        if (!nacosEnabled) {
+            log.info("Sentinel Nacos 动态规则已关闭，{}=false，仅使用本地 Sentinel 规则", NACOS_ENABLED_KEY);
+            return;
+        }
+
         initNacosRules();
+    }
+
+    private static void initLocalRules() {
+        FlowRule flowRule = new FlowRule();
+        flowRule.setResource(COUPON_SECKILL_PRE_DEDUCT);
+        flowRule.setGrade(RuleConstant.FLOW_GRADE_QPS);
+        flowRule.setCount(100);
+        flowRule.setLimitApp("default");
+        flowRule.setStrategy(RuleConstant.STRATEGY_DIRECT);
+        flowRule.setControlBehavior(RuleConstant.CONTROL_BEHAVIOR_DEFAULT);
+        FlowRuleManager.loadRules(List.of(flowRule));
+
+        ParamFlowRule paramFlowRule = new ParamFlowRule();
+        paramFlowRule.setResource(COUPON_SECKILL_PRE_DEDUCT);
+        paramFlowRule.setParamIdx(0);
+        paramFlowRule.setCount(100);
+        paramFlowRule.setDurationInSec(1);
+        ParamFlowRuleManager.loadRules(List.of(paramFlowRule));
+
+        DegradeRule slowCallRule = new DegradeRule();
+        slowCallRule.setResource(COUPON_SECKILL_PRE_DEDUCT);
+        slowCallRule.setGrade(RuleConstant.DEGRADE_GRADE_RT);
+        slowCallRule.setCount(300);
+        slowCallRule.setTimeWindow(10);
+        slowCallRule.setMinRequestAmount(5);
+        slowCallRule.setSlowRatioThreshold(0.5);
+        slowCallRule.setStatIntervalMs(1000);
+
+        DegradeRule exceptionRatioRule = new DegradeRule();
+        exceptionRatioRule.setResource(COUPON_SECKILL_PRE_DEDUCT);
+        exceptionRatioRule.setGrade(RuleConstant.DEGRADE_GRADE_EXCEPTION_RATIO);
+        exceptionRatioRule.setCount(0.5);
+        exceptionRatioRule.setTimeWindow(10);
+        exceptionRatioRule.setMinRequestAmount(5);
+        exceptionRatioRule.setStatIntervalMs(1000);
+        DegradeRuleManager.loadRules(List.of(slowCallRule, exceptionRatioRule));
+
+        log.info("Sentinel 本地规则初始化成功，resource={}, flowQps=100, paramQps=100, degradeRules=2",
+                COUPON_SECKILL_PRE_DEDUCT);
     }
 
     private static void initNacosRules() {

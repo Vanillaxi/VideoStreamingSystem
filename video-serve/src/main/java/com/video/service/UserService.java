@@ -1,5 +1,9 @@
 package com.video.service;
 
+import com.video.pojo.dto.PageResult;
+import com.video.pojo.dto.PasswordUpdateRequest;
+import com.video.pojo.dto.UserAdminVO;
+import com.video.pojo.dto.UserInfoVO;
 import com.video.pojo.entity.User;
 import jakarta.servlet.http.Part;
 
@@ -18,6 +22,9 @@ public interface UserService {
     //修改信息
     void updateUserInfo(User user);
 
+    // 修改密码
+    void updatePassword(PasswordUpdateRequest request);
+
     //上传或修改头像
     void updateAvatar(Part file) throws IOException;
 
@@ -31,5 +38,9 @@ public interface UserService {
     void promoteUser(Long userId, Integer role);
 
     //查看用户信息
-    User getById(Long id);
+    UserInfoVO getById(Long id);
+
+    PageResult<UserAdminVO> listUsersByAdmin(Integer page, Integer pageSize);
+
+    PageResult<UserAdminVO> searchUsersByAdmin(String nickname, String username, Integer page, Integer pageSize);
 }

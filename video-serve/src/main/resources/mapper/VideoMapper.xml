@@ -260,8 +260,32 @@
         create_time AS createTime,
         update_time AS updateTime
         FROM videos
-        WHERE (? IS NULL
-           OR hot_score &lt; ?
+        WHERE status = 'PUBLISHED'
+        ORDER BY hot_score DESC, create_time DESC, id DESC
+        LIMIT ?
+    </select>
+
+    <select id="getHotCursorPageAfter" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        WHERE status = 'PUBLISHED'
+          AND (hot_score &lt; ?
            OR (hot_score = ? AND create_time &lt; ?)
            OR (hot_score = ? AND create_time = ? AND id &lt; ?))
         ORDER BY hot_score DESC, create_time DESC, id DESC
@@ -287,8 +311,88 @@
         create_time AS createTime,
         update_time AS updateTime
         FROM videos
-        WHERE (? IS NULL OR create_time &lt; ? OR (create_time = ? AND id &lt; ?))
+        WHERE status = 'PUBLISHED'
         ORDER BY create_time DESC, id DESC
+        LIMIT ?
+    </select>
+
+    <select id="getTimeCursorPageAfter" resultType="com.video.pojo.entity.Video">
+        SELECT
+        id,
+        title,
+        description,
+        category_id AS categoryId,
+        user_id AS userId,
+        video_url AS videoUrl,
+        object_key AS objectKey,
+        size,
+        status,
+        like_count AS likesCount,
+        comment_count AS commentCount,
+        favorite_count AS favoriteCount,
+        view_count AS viewCount,
+        hot_score AS hotScore,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM videos
+        WHERE status = 'PUBLISHED'
+          AND (create_time &lt; ? OR (create_time = ? AND id &lt; ?))
+        ORDER BY create_time DESC, id DESC
+        LIMIT ?
+    </select>
+
+    <select id="getFollowingFeedTimePage" resultType="com.video.pojo.entity.Video">
+        SELECT
+        v.id,
+        v.title,
+        v.description,
+        v.category_id AS categoryId,
+        v.user_id AS userId,
+        v.video_url AS videoUrl,
+        v.object_key AS objectKey,
+        v.size,
+        v.status,
+        v.like_count AS likesCount,
+        v.comment_count AS commentCount,
+        v.favorite_count AS favoriteCount,
+        v.view_count AS viewCount,
+        v.hot_score AS hotScore,
+        v.create_time AS createTime,
+        v.update_time AS updateTime
+        FROM videos v
+        JOIN user_follow f ON f.following_id = v.user_id
+        JOIN user u ON u.id = v.user_id
+        WHERE f.follower_id = ?
+          AND v.status = 'PUBLISHED'
+        ORDER BY v.create_time DESC, v.id DESC
+        LIMIT ?
+    </select>
+
+    <select id="getFollowingFeedTimePageAfter" resultType="com.video.pojo.entity.Video">
+        SELECT
+        v.id,
+        v.title,
+        v.description,
+        v.category_id AS categoryId,
+        v.user_id AS userId,
+        v.video_url AS videoUrl,
+        v.object_key AS objectKey,
+        v.size,
+        v.status,
+        v.like_count AS likesCount,
+        v.comment_count AS commentCount,
+        v.favorite_count AS favoriteCount,
+        v.view_count AS viewCount,
+        v.hot_score AS hotScore,
+        v.create_time AS createTime,
+        v.update_time AS updateTime
+        FROM videos v
+        JOIN user_follow f ON f.following_id = v.user_id
+        JOIN user u ON u.id = v.user_id
+        WHERE f.follower_id = ?
+          AND v.status = 'PUBLISHED'
+          AND (v.create_time &lt; ? OR (v.create_time = ? AND v.id &lt; ?))
+        ORDER BY v.create_time DESC, v.id DESC
         LIMIT ?
     </select>
 

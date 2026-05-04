@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class KafkaTestConsumer {
-    private static final String DEFAULT_TOPIC = "video_publish";
+    private static final String DEFAULT_TOPIC = "video_published";
     private static final String TEST_GROUP_ID = "video-kafka-test-group";
     private static final AtomicBoolean STARTED = new AtomicBoolean(false);
     private static final Properties config = loadConfig();

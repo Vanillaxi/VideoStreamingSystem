@@ -16,4 +16,6 @@ public interface CouponMapper {
     Coupon getByIdForUpdate(Long id);
 
     int decreaseStock(Long id);
+
+    int disable(Long id);
 }

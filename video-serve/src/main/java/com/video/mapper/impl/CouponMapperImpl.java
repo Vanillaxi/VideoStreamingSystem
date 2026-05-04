@@ -90,6 +90,12 @@ public class CouponMapperImpl implements CouponMapper {
         return JdbcUtils.executeUpdate(sql, id);
     }
 
+    @Override
+    public int disable(Long id) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.CouponMapper.disable");
+        return JdbcUtils.executeUpdate(sql, id);
+    }
+
     private void rollback(Connection conn) {
         try {
             conn.rollback();

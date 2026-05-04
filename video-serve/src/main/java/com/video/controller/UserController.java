@@ -5,6 +5,7 @@ import com.video.annotation.MyHeader;
 import com.video.annotation.MyMapping;
 import com.video.annotation.RequireRole;
 import com.video.pojo.entity.User;
+import com.video.pojo.dto.PasswordUpdateRequest;
 import com.video.pojo.dto.Result;
 import com.video.service.UserService;
 import com.video.utils.AuthHeaderUtil;
@@ -61,6 +62,12 @@ public class UserController extends BaseController {
     public Result updateUserInfo(User user) {
         userService.updateUserInfo(user);
         return Result.success("个人资料修改成功");
+    }
+
+    @MyMapping(value="/password",method="PUT")
+    public Result updatePassword(PasswordUpdateRequest request) {
+        userService.updatePassword(request);
+        return Result.success("密码修改成功");
     }
 
     /**

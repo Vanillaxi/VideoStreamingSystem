@@ -3,7 +3,9 @@ package com.video.config;
 import com.video.messageQueue.kafka.KafkaProducerUtil;
 import com.video.messageQueue.kafka.KafkaTestConsumer;
 import com.video.messageQueue.kafka.KafkaTestProducer;
-import com.video.messageQueue.kafka.VideoPublishConsumer;
+import com.video.messageQueue.kafka.VideoFeedCacheConsumer;
+import com.video.messageQueue.kafka.VideoPublishNotificationConsumer;
+import com.video.messageQueue.kafka.VideoPublishNotifyConsumer;
 import com.video.proxy.BeanFactory;
 import com.video.messageQueue.rocketmq.CouponSeckillTxConsumer;
 import com.video.messageQueue.rocketmq.CouponSeckillTxProducer;
@@ -35,7 +37,9 @@ public class ContextLoaderListener implements ServletContextListener {
             BeanFactory.init();
             SentinelRuleManager.init();
             VideoViewCountFlushTask.start();
-            VideoPublishConsumer.start();
+            VideoPublishNotifyConsumer.start();
+            VideoPublishNotificationConsumer.start();
+            VideoFeedCacheConsumer.start();
             CouponSeckillTxConsumer.start();
             log.info("优惠券秒杀 MQ 模式：RocketMQ transaction");
             KafkaTestConsumer.start();
@@ -56,7 +60,9 @@ public class ContextLoaderListener implements ServletContextListener {
             KafkaTestProducer.close();
             CouponSeckillTxConsumer.shutdown();
             CouponSeckillTxProducer.close();
-            VideoPublishConsumer.shutdown();
+            VideoFeedCacheConsumer.shutdown();
+            VideoPublishNotificationConsumer.shutdown();
+            VideoPublishNotifyConsumer.shutdown();
             KafkaProducerUtil.close();
             VideoViewCountFlushTask.shutdown();//定时刷库任务启动
             BeanFactory.destroy();

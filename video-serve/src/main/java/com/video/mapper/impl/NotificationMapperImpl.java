@@ -19,4 +19,10 @@ public class NotificationMapperImpl implements NotificationMapper {
                 notification.getIsRead(),
                 notification.getCreateTime());
     }
+
+    @Override
+    public boolean exists(Long userId, String type, Long relatedId) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.NotificationMapper.exists");
+        return JdbcUtils.executeExists(sql, userId, type, relatedId);
+    }
 }

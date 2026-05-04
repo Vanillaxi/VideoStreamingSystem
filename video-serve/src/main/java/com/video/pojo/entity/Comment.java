@@ -26,7 +26,9 @@ public class Comment {
 
     private String username;
     private String nickname;
+    private String avatarUrl;
     private String replyToUsername;
     private String replyToNickname;
+    private String replyToAvatarUrl;
     private List<Comment> replies = new ArrayList<>();
 }

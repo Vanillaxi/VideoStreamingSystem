@@ -15,12 +15,14 @@ info:
     - Apifox Header：Authorization = Bearer {{bearerToken}}
     - 兼容 Query：ws://localhost:8080/video-serve/ws/{userId}?token={{bearerToken}}
     - LoginFilter 会放行 /ws/* 握手请求，实际鉴权由 WebSocket 服务端完成。
-    - 收到 Kafka Feed 推送时，在线粉丝会收到 NEW_VIDEO 消息。
+    - 收到 Kafka 视频发布事件时，在线粉丝会收到 FOLLOWING_VIDEO_PUBLISHED 消息。
     - 优惠券秒杀结果通过 COUPON_SECKILL_RESULT 消息推送。
+    - 注意：WebSocket 只是实时通道。视频发布事件来源是 Kafka video_published；优惠券抢券结果来源是 RocketMQ coupon_seckill_tx，二者互不替代。
 
     异步消息说明：
-    - video_publish：Kafka，视频发布后写入粉丝 Feed。
+    - video_published：Kafka 视频发布事件总线，发布后异步处理 WebSocket 通知、站内通知和 Feed 缓存刷新。
     - coupon_seckill_tx：RocketMQ 事务消息，Redis Lua 预扣成功后执行本地事务创建 coupon_order。
+    - COUPON_SECKILL_RESULT 不经过 Kafka video_published，由优惠券秒杀链路直接通过 WebSocket 推送。
     - message_outbox 表结构暂时保留，但秒杀主链路不再写入、不再读取。
 
     Sentinel 说明：
@@ -144,6 +146,7 @@ paths:
     post:
       tags: [User]
       summary: 修改用户信息
+      description: 只允许修改展示资料，例如 nickname。该接口不允许修改 username/password；修改密码请使用 PUT /user/password。
       operationId: updateUser
       security:
         - bearerAuth: []
@@ -227,7 +230,43 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/User'
+                        $ref: '#/components/schemas/UserInfoVO'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /user/password:
+    put:
+      tags: [User]
+      summary: 修改当前登录用户密码
+      description: 必须校验旧密码。修改成功后建议前端清除 token，并跳转登录页重新登录。
+      operationId: updatePassword
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordUpdateRequest'
+            example:
+              oldPassword: "123456"
+              newPassword: "654321"
+              confirmPassword: "654321"
+      responses:
+        '200':
+          description: 密码修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+              example:
+                code: 1
+                msg: success
+                data: 密码修改成功
         '401':
           $ref: '#/components/responses/UnauthorizedResponse'
         default:
@@ -314,6 +353,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StringResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /admin/users:
+    get:
+      tags: [Admin, User]
+      summary: 管理员分页查询用户列表
+      description: 需要 role >= 2。返回管理员管理用字段，不返回 password。
+      operationId: adminListUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 管理员用户分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserAdminPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /admin/users/search:
+    get:
+      tags: [Admin, User]
+      summary: 管理员搜索用户
+      description: |
+        需要 role >= 2。当前后端参数为 nickname 和 username，均按 LIKE 查询。
+        前端搜索框可将同一个 keyword 同时传给 nickname 和 username。
+      operationId: adminSearchUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: nickname
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 昵称关键字，LIKE 查询。
+        - name: username
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 用户名关键字，LIKE 查询。仅管理员接口返回/搜索 username。
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 管理员用户分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserAdminPageResult'
         '401':
           $ref: '#/components/responses/UnauthorizedResponse'
         '403':
@@ -486,7 +601,12 @@ paths:
     get:
       tags: [Video]
       summary: 全站视频 Feed 游标分页
-      description: sort=time 时只需要 cursorCreateTime + cursorId；sort=hot 时需要 cursorHotScore + cursorCreateTime + cursorId。
+      description: |
+        全站视频流游标分页。
+        第一页只传 sort 和 pageSize 即可，例如 sort=time&pageSize=20。
+        不要传空字符串游标；后端会把空字符串基础类型参数视为 null，避免 parseDouble("") 崩溃。
+        sort=time 的后续页传 cursorCreateTime + cursorId。
+        sort=hot 的后续页传 cursorHotScore + cursorCreateTime + cursorId。
       operationId: getVideoFeedCursorPage
       security:
         - bearerAuth: []
@@ -500,6 +620,39 @@ paths:
       responses:
         '200':
           description: 视频游标分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VideoCursorPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /video/feed/following:
+    get:
+      tags: [Video, Feed]
+      summary: 查询当前用户关注动态视频流
+      description: |
+        第一版直接查 MySQL，保证准确性，不使用每粉丝 Redis 收件箱。
+        首页只传 pageSize；后续页传上一页返回的 nextCreateTime 和 nextId。
+        当前 videos.status 是字符串，SQL 使用 status='PUBLISHED'。
+      operationId: getFollowingVideoFeed
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/CursorCreateTime'
+        - $ref: '#/components/parameters/CursorId'
+        - $ref: '#/components/parameters/CursorPageSize'
+      responses:
+        '200':
+          description: 关注动态视频游标分页结果
           content:
             application/json:
               schema:
@@ -785,7 +938,7 @@ paths:
     get:
       tags: [Feed]
       summary: 查询当前用户关注流 Feed
-      description: 从 Redis ZSet feed:user:{userId} 游标分页读取 videoId，并批量查询视频详情。
+      description: 旧版关注流接口，从 Redis ZSet feed:user:{userId} 游标分页读取 videoId，并批量查询视频详情。新页面优先使用 /video/feed/following。
       operationId: getFollowingFeed
       security:
         - bearerAuth: []
@@ -1139,7 +1292,7 @@ paths:
     post:
       tags: [Test]
       summary: 发送 Kafka 测试消息
-      description: 本地开发测试接口。手动指定 videoId、authorId、createdAt，发送 VIDEO_PUBLISHED 消息到 video_publish，用于测试 Kafka Consumer、Redis Feed 和 WebSocket 推送。
+      description: 本地开发测试接口。手动指定 videoId、authorId、createdAt，发送 video_published 消息到 video_published topic，用于测试 Kafka 事件消费者。
       operationId: sendKafkaTestMessage
       security:
         - bearerAuth: []
@@ -1217,10 +1370,98 @@ paths:
         default:
           $ref: '#/components/responses/ErrorResponse'
 
+  /admin/coupon/list:
+    get:
+      tags: [Admin, Coupon]
+      summary: 管理员查询优惠券列表
+      description: 需要 role >= 2。status 不传时查询全部；普通用户优惠券列表只返回可用券。
+      operationId: adminListCoupons
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [0, 1]
+          description: 状态：0停用，1可用；不传查询全部。
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 管理员优惠券分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResult'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CouponPageResult'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /admin/coupon/delete:
+    delete:
+      tags: [Admin, Coupon]
+      summary: 管理员停用优惠券
+      description: |
+        需要 role >= 2。当前实现为逻辑停用：将 coupon.status 更新为 0。
+        MySQL 更新成功后删除 Redis 秒杀 key：coupon:seckill:stock:{couponId}、coupon:seckill:users:{couponId}。
+      operationId: adminDisableCoupon
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - name: couponId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 优惠券ID
+      responses:
+        '200':
+          description: 优惠券已停用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StringResult'
+              example:
+                code: 1
+                msg: success
+                data: 优惠券已停用
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
   /coupon/list:
     get:
       tags: [Coupon]
-      summary: 查询优惠券列表
+      summary: 查询普通用户可见优惠券列表
+      description: 当前普通列表只返回 status=1 的可用优惠券；即使传 status 参数，后端也会按可用券查询。
       operationId: listCoupons
       security:
         - bearerAuth: []
@@ -1232,7 +1473,7 @@ paths:
           schema:
             type: integer
             enum: [0, 1]
-          description: 状态：0禁用，1启用；不传查询全部。
+          description: 兼容旧参数；普通列表当前固定只返回 status=1 可用券。
         - name: page
           in: query
           required: false
@@ -1438,12 +1679,15 @@ paths:
         注意：
         - /ws/{userId} 中的 userId 必须和 token 中的 userId 一致。
         - LoginFilter 会放行 /ws/* 握手请求，WebSocket 内部会继续校验 Authorization 或 token。
+        - WebSocket 只负责实时推送，不负责存储最终数据；页面数据仍以 HTTP 接口查询为准。
 
-        Kafka Consumer 推送在线粉丝时，消息示例：
-        {"type":"NEW_VIDEO","videoId":1,"authorId":2,"createdAt":1777440000000,"content":"你关注的用户发布了新视频"}
+        Kafka 消费者推送在线粉丝时，消息示例：
+        {"type":"FOLLOWING_VIDEO_PUBLISHED","videoId":1,"authorId":2,"title":"新视频","createTime":"2026-05-04 10:00:00","createdAt":1777440000000,"content":"你关注的人发布了新视频"}
 
-        优惠券秒杀结果推送示例：
-        {"type":"COUPON_SECKILL_RESULT","status":"SUCCESS","couponId":1,"couponCode":"CPN-XXXX-XXXX-XXXX-XXXX","message":"抢券成功"}
+        优惠券秒杀结果由 RocketMQ coupon_seckill_tx 消费者推送，不经过 Kafka video_published。推送示例：
+        PROCESSING: {"type":"COUPON_SECKILL_RESULT","status":"PROCESSING","couponId":1,"couponCode":null,"message":"抢券请求已受理"}
+        SUCCESS: {"type":"COUPON_SECKILL_RESULT","status":"SUCCESS","couponId":1,"couponCode":"CPN-XXXX-XXXX-XXXX-XXXX","message":"抢券成功"}
+        FAILED: {"type":"COUPON_SECKILL_RESULT","status":"FAILED","couponId":1,"couponCode":null,"message":"抢券失败，请稍后重试"}
       operationId: websocketNotification
       parameters:
         - name: Authorization
@@ -1815,13 +2059,102 @@ components:
 
     UserUpdateRequest:
       type: object
+      description: 修改用户展示资料；后端忽略 username/password，修改密码请使用 PasswordUpdateRequest。
       properties:
-        username:
+        nickname:
           type: string
-        password:
+
+    PasswordUpdateRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword:
+          type: string
+          description: 当前旧密码，后端必须校验。
+        newPassword:
+          type: string
+          description: 新密码，按当前项目密码哈希方式保存。
+        confirmPassword:
+          type: string
+          description: 确认新密码；前端已校验，后端收到时也会校验一致性。
+
+    UserInfoVO:
+      type: object
+      description: 普通用户详情展示 VO，不返回 password，不返回 username。
+      properties:
+        targetUserId:
+          type: integer
+          format: int64
+          description: 业务跳转用用户ID，前端不直接展示为普通资料字段。
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+        avatar:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        introduction:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          nullable: true
+        role:
+          type: integer
+          description: 0普通用户，1会员，2管理员，3香草管理员。
+        followCount:
+          type: integer
+          format: int64
+        fanCount:
+          type: integer
+          format: int64
+        mutualFollowCount:
+          type: integer
+          format: int64
+        isFollowed:
+          type: boolean
+        createTime:
+          type: string
+          format: date-time
+
+    UserAdminVO:
+      type: object
+      description: 管理员用户管理 VO，不返回 password；可返回 username 便于管理。
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
           type: string
         nickname:
           type: string
+        avatarUrl:
+          type: string
+        role:
+          type: integer
+          description: 0普通用户，1会员，2管理员，3香草管理员。
+        status:
+          type: string
+          example: 正常
+        createTime:
+          type: string
+          format: date-time
+        updateTime:
+          type: string
+          format: date-time
+
+    UserAdminPageResult:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserAdminVO'
 
     Video:
       type: object
@@ -1839,6 +2172,16 @@ components:
         userId:
           type: integer
           format: int64
+        authorId:
+          type: integer
+          format: int64
+          description: 视频作者用户ID，前端用于跳转博主主页。
+        authorNickname:
+          type: string
+          description: 视频作者昵称。
+        authorAvatarUrl:
+          type: string
+          description: 视频作者头像地址。
         videoUrl:
           type: string
           format: uri

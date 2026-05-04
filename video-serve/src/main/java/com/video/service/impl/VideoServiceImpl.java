@@ -8,10 +8,12 @@ import com.video.exception.SystemException;
 import com.video.messageQueue.kafka.KafkaProducerUtil;
 import com.video.pojo.dto.CursorPageResult;
 import com.video.pojo.dto.PageResult;
+import com.video.pojo.dto.VideoVO;
 import com.video.pojo.dto.VideoPublishedEvent;
 import com.video.pojo.entity.Video;
 import com.video.pojo.entity.User;
 import com.video.mapper.VideoMapper;
+import com.video.mapper.UserMapper;
 import com.video.service.VideoService;
 import com.video.utils.CacheClient;
 import com.video.utils.LuaScriptUtil;
@@ -47,6 +49,9 @@ public class VideoServiceImpl implements VideoService {
     private VideoMapper videoMapper;
 
     @MyAutowired
+    private UserMapper userMapper;
+
+    @MyAutowired
     private CacheClient cacheClient;
 
     /**
@@ -55,7 +60,7 @@ public class VideoServiceImpl implements VideoService {
      * @return
      */
     @Override
-    public Video getVideoById(Long id){
+    public VideoVO getVideoById(Long id){
         try {
             RedisUtil.incr(VIEW_COUNT_PREFIX + id);
         } catch (Exception e) {
@@ -67,7 +72,7 @@ public class VideoServiceImpl implements VideoService {
             throw new BusinessException(ErrorCode.VIDEO_NOT_FOUND);
         }
 
-        return video;
+        return toVideoVO(video);
     }
 
     /**
@@ -191,12 +196,12 @@ public class VideoServiceImpl implements VideoService {
     }
 
     @Override
-    public CursorPageResult<Video> getHotCursorPage(Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
+    public CursorPageResult<VideoVO> getHotCursorPage(Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
         return getFeedCursorPage("hot", cursorHotScore, cursorCreateTime, cursorId, pageSize);
     }
 
     @Override
-    public CursorPageResult<Video> getFeedCursorPage(String sort, Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
+    public CursorPageResult<VideoVO> getFeedCursorPage(String sort, Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
         String normalizedSort = normalizeSort(sort);
         int safePageSize = normalizeCursorPageSize(pageSize);
         validateCursor(normalizedSort, cursorHotScore, cursorCreateTime, cursorId);
@@ -216,7 +221,43 @@ public class VideoServiceImpl implements VideoService {
 
         Video lastVideo = videoList.isEmpty() ? null : videoList.get(videoList.size() - 1);
         return new CursorPageResult<>(
-                videoList,
+                toVideoVOList(videoList),
+                hasNext,
+                lastVideo == null ? null : lastVideo.getHotScore(),
+                lastVideo == null ? null : lastVideo.getCreateTime(),
+                lastVideo == null ? null : lastVideo.getId(),
+                safePageSize
+        );
+    }
+
+    @Override
+    public CursorPageResult<VideoVO> getFollowingFeedCursorPage(String cursorCreateTime, Long cursorId, Integer pageSize) {
+        User currentUser = UserHolder.getUser();
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_LOGIN);
+        }
+        int safePageSize = normalizeCursorPageSize(pageSize);
+        boolean hasTime = cursorCreateTime != null && !cursorCreateTime.isBlank();
+        if (hasTime != (cursorId != null)) {
+            throw new BusinessException(400, "关注动态游标参数不完整");
+        }
+        LocalDateTime cursorTime = parseCursorCreateTime(cursorCreateTime);
+
+        List<Video> videoList;
+        if (cursorTime == null && cursorId == null) {
+            videoList = videoMapper.getFollowingFeedTimePage(currentUser.getId(), safePageSize + 1);
+        } else {
+            videoList = videoMapper.getFollowingFeedTimePageAfter(currentUser.getId(), cursorTime, cursorId, safePageSize + 1);
+        }
+
+        boolean hasNext = videoList.size() > safePageSize;
+        if (hasNext) {
+            videoList = new ArrayList<>(videoList.subList(0, safePageSize));
+        }
+
+        Video lastVideo = videoList.isEmpty() ? null : videoList.get(videoList.size() - 1);
+        return new CursorPageResult<>(
+                toVideoVOList(videoList),
                 hasNext,
                 lastVideo == null ? null : lastVideo.getHotScore(),
                 lastVideo == null ? null : lastVideo.getCreateTime(),
@@ -257,7 +298,7 @@ public class VideoServiceImpl implements VideoService {
         int offset = (page - 1) * pageSize;
         List<Video> videoList = videoMapper.getVideoPageByTitle(searchTitle, offset, pageSize, sort);
 
-        return new PageResult(total, videoList);
+        return new PageResult(total, toVideoVOList(videoList));
     }
 
     /**
@@ -287,7 +328,7 @@ public class VideoServiceImpl implements VideoService {
         int offset = (page - 1) * pageSize;
         List<Video> videoList = videoMapper.getVideoPageByCategoryId(categoryId, offset, pageSize, sort);
 
-        return new PageResult(total, videoList);
+        return new PageResult(total, toVideoVOList(videoList));
     }
 
     //从db查视频
@@ -297,7 +338,7 @@ public class VideoServiceImpl implements VideoService {
 
     private PageResult getHotTop50FromDb() {
         List<Video> videoList = videoMapper.getHotTop50();
-        return new PageResult(videoList.size(), videoList);
+        return new PageResult(videoList.size(), toVideoVOList(videoList));
     }
 
     private PageResult getNewestVideosFromDb(int page, int pageSize) {
@@ -307,7 +348,7 @@ public class VideoServiceImpl implements VideoService {
         }
         int offset = (page - 1) * pageSize;
         List<Video> videoList = videoMapper.getNewestPage(offset, pageSize);
-        return new PageResult(total, videoList);
+        return new PageResult(total, toVideoVOList(videoList));
     }
 
     private int normalizeCursorPageSize(Integer pageSize) {
@@ -424,6 +465,57 @@ public class VideoServiceImpl implements VideoService {
         return likeCount * 3D + commentCount * 5D + favoriteCount * 4D + viewCount + 100D;
     }
 
+    private List<VideoVO> toVideoVOList(List<Video> videos) {
+        if (videos == null || videos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Long> userIds = videos.stream()
+                .map(Video::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+        java.util.Map<Long, User> userMap = new java.util.HashMap<>();
+        for (User user : userMapper.getByIds(userIds)) {
+            userMap.put(user.getId(), user);
+        }
+        List<VideoVO> result = new ArrayList<>();
+        for (Video video : videos) {
+            result.add(toVideoVO(video, userMap.get(video.getUserId())));
+        }
+        return result;
+    }
+
+    private VideoVO toVideoVO(Video video) {
+        if (video == null) {
+            return null;
+        }
+        User author = video.getUserId() == null ? null : userMapper.getByUserId(video.getUserId());
+        return toVideoVO(video, author);
+    }
+
+    private VideoVO toVideoVO(Video video, User author) {
+        VideoVO vo = new VideoVO();
+        vo.setId(video.getId());
+        vo.setTitle(video.getTitle());
+        vo.setDescription(video.getDescription());
+        vo.setCategoryId(video.getCategoryId());
+        vo.setUserId(video.getUserId());
+        vo.setAuthorId(video.getUserId());
+        vo.setAuthorNickname(author == null ? null : author.getNickname());
+        vo.setAuthorAvatarUrl(author == null ? null : author.getAvatarUrl());
+        vo.setVideoUrl(video.getVideoUrl());
+        vo.setSize(video.getSize());
+        vo.setStatus(video.getStatus());
+        vo.setLikesCount(video.getLikesCount());
+        vo.setCommentCount(video.getCommentCount());
+        vo.setFavoriteCount(video.getFavoriteCount());
+        vo.setViewCount(video.getViewCount());
+        vo.setHotScore(video.getHotScore());
+        vo.setCreateTime(video.getCreateTime());
+        vo.setUpdateTime(video.getUpdateTime());
+        return vo;
+    }
+
     private void sendVideoPublishedEvent(Video video) {
         if (video.getId() == null) {
             log.warn("视频发布 Kafka 消息跳过：videoId 为空，title={}", video.getTitle());
@@ -433,12 +525,17 @@ public class VideoServiceImpl implements VideoService {
         event.setEventId(UUID.randomUUID().toString());
         event.setVideoId(video.getId());
         event.setAuthorId(video.getUserId());
-        event.setCreatedAt(video.getCreateTime()
+        event.setTitle(video.getTitle());
+        event.setCoverUrl(null);
+        event.setCreateTime(video.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        long eventTime = video.getCreateTime()
                 .atZone(java.time.ZoneId.systemDefault())
                 .toInstant()
-                .toEpochMilli());
+                .toEpochMilli();
+        event.setEventTime(eventTime);
+        event.setCreatedAt(eventTime);
         event.setHotScore(video.getHotScore());
-        event.setEventType("VIDEO_PUBLISHED");
+        event.setEventType("video_published");
         KafkaProducerUtil.sendVideoPublished(event);
     }
 

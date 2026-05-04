@@ -24,7 +24,9 @@
         role,
         nickname,
         avatar_url AS avatarUrl,
-        avatar_object_key AS avatarObjectKey
+        avatar_object_key AS avatarObjectKey,
+        create_time AS createTime,
+        update_time AS updateTime
         FROM user
         WHERE id = ?
     </select>
@@ -36,7 +38,9 @@
         role,
         nickname,
         avatar_url AS avatarUrl,
-        avatar_object_key AS avatarObjectKey
+        avatar_object_key AS avatarObjectKey,
+        create_time AS createTime,
+        update_time AS updateTime
         FROM user
         WHERE id IN (%s)
     </select>
@@ -53,6 +57,48 @@
         WHERE username IN (%s)
     </select>
 
+    <select id="listUsers" resultType="com.video.pojo.entity.User">
+        SELECT
+        id,
+        username,
+        role,
+        nickname,
+        avatar_url AS avatarUrl,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM user
+        ORDER BY create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="countUsers" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM user
+    </select>
+
+    <select id="searchUsers" resultType="com.video.pojo.entity.User">
+        SELECT
+        id,
+        username,
+        role,
+        nickname,
+        avatar_url AS avatarUrl,
+        create_time AS createTime,
+        update_time AS updateTime
+        FROM user
+        WHERE (? IS NULL OR nickname LIKE ?)
+          AND (? IS NULL OR username LIKE ?)
+        ORDER BY create_time DESC
+        LIMIT ?, ?
+    </select>
+
+    <select id="countSearchUsers" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM user
+        WHERE (? IS NULL OR nickname LIKE ?)
+          AND (? IS NULL OR username LIKE ?)
+    </select>
+
     <!--添加用户-->
     <insert id="insert">
         INSERT INTO user (username, password, role, nickname, avatar_url, avatar_object_key, create_user, update_user)
@@ -62,12 +108,40 @@
     <!--修改用户信息-->
     <update id="update">
         UPDATE user
-        SET username=?,
-        password = ?,
+        SET password = ?,
         nickname = ?,
         avatar_url = ?,
         avatar_object_key = ?,
         role=?,
+        update_user=?
+        WHERE id = ?
+    </update>
+
+    <update id="updateProfile">
+        UPDATE user
+        SET nickname = ?,
+        update_user=?
+        WHERE id = ?
+    </update>
+
+    <update id="updateAvatar">
+        UPDATE user
+        SET avatar_url = ?,
+        avatar_object_key = ?,
+        update_user=?
+        WHERE id = ?
+    </update>
+
+    <update id="updateRole">
+        UPDATE user
+        SET role=?,
+        update_user=?
+        WHERE id = ?
+    </update>
+
+    <update id="updatePassword">
+        UPDATE user
+        SET password = ?,
         update_user=?
         WHERE id = ?
     </update>

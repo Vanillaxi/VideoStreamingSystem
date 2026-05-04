@@ -2,6 +2,7 @@
 
 一个不依赖 Spring / Spring Boot 的视频系统后端项目。项目使用 Servlet + 自定义 IOC / MVC / XML SQL 映射实现后端能力，支持视频上传到阿里云 OSS、评论、收藏、关注、Feed 推送、WebSocket 通知、优惠券秒杀、热度排序、Redis 缓存和播放量异步累计。
 
+
 ## 项目特点
 
 - 自定义 IOC：`@MyComponent`、`@MyAutowired`、`BeanFactory`
@@ -35,7 +36,9 @@
 | 模块 | 功能 |
 | --- | --- |
 | 用户 | 注册、登录、登出、修改资料、上传头像、查询用户、封号、提权 |
-| 视频 | 本地视频文件上传、OSS 存储、查询详情、标题搜索、分区查询、热门 Top50、最新列表、删除视频 |
+| 用户安全 | 修改密码独立接口，必须校验旧密码；资料更新接口不允许修改 username/password |
+| 管理员 | 管理员用户列表、用户搜索、修改角色、封禁用户、优惠券创建/列表/停用 |
+| 视频 | 本地视频文件上传、OSS 存储、查询详情、标题搜索、分区查询、热门 Top50、最新列表、Feed 游标分页、删除视频 |
 | 分类 | 查询启用分类列表 |
 | 评论 | 一级评论、子评论/楼中楼、两级结构返回、逻辑删除、点赞、按时间/热度排序 |
 | 收藏 | 收藏、取消收藏、是否收藏、收藏列表，MySQL + Redis ZSet |
@@ -97,8 +100,10 @@ oss.bucket=video-streaming-system
 oss.domain=https://video-streaming-system.oss-cn-hangzhou.aliyuncs.com
 
 kafka.bootstrap.servers=localhost:9092
-kafka.video.publish.topic=video_publish
-kafka.video.publish.group.id=video-feed-push-group
+kafka.video.publish.topic=video_published
+kafka.video.notify.group.id=video-publish-notify-group
+kafka.video.notification.group.id=video-publish-notification-group
+kafka.video.feed-cache.group.id=video-feed-cache-group
 
 rocketmq.namesrvAddr=localhost:9876
 rocketmq.topic.couponSeckillTx=coupon_seckill_tx
@@ -111,6 +116,7 @@ sentinel.nacos.group=SENTINEL_GROUP
 sentinel.nacos.flowDataId=video-system-flow-rules
 sentinel.nacos.paramFlowDataId=video-system-param-flow-rules
 sentinel.nacos.degradeDataId=video-system-degrade-rules
+sentinel.nacos.enabled=false
 ```
 
 AccessKey 从环境变量读取，不要写进配置文件：
@@ -212,6 +218,15 @@ coupon:seckill:stock:{couponId}
 coupon:seckill:users:{couponId}
 ```
 
+管理员停用优惠券时，后端先更新 MySQL，将 `coupon.status` 改为 `0`，再删除：
+
+```text
+coupon:seckill:stock:{couponId}
+coupon:seckill:users:{couponId}
+```
+
+当前普通优惠券列表接口固定只展示 `status=1` 的可用券；管理员优惠券列表可查看全部或按状态筛选。
+
 Lua 返回码：
 
 ```text
@@ -226,12 +241,29 @@ Lua 返回码：
 
 | topic | 说明 |
 | --- | --- |
-| `video_publish` | Kafka：视频发布事件，Consumer 写入粉丝 Feed 并推送在线粉丝 |
+| `video_published` | Kafka：视频发布事件总线，异步处理 WebSocket 通知、站内通知、Feed 最新缓存刷新 |
 | `coupon_seckill_tx` | RocketMQ：优惠券事务消息主链路，提交后推送抢券成功 |
+
+WebSocket 只是实时通知通道，不是事件总线，也不是最终数据源：
+
+- 视频发布实时通知来源：Kafka `video_published` -> `VideoPublishNotifyConsumer`
+- 优惠券抢券实时通知来源：RocketMQ `coupon_seckill_tx` -> `CouponSeckillTxConsumer`
+- 两条链路互不替代；Kafka 视频发布改造不会取消优惠券 `COUPON_SECKILL_RESULT`
 
 `message_outbox` 表结构暂时保留用于安全回滚，但当前秒杀主链路不再写入、不再读取，也不再启动 Outbox 定时任务。
 
-事务消息链路：
+视频发布事件链路：
+
+```text
+/video/post
+-> MySQL videos 落库成功
+-> Kafka topic video_published
+-> VideoPublishNotifyConsumer：给在线粉丝推 WebSocket
+-> VideoPublishNotificationConsumer：写 notification 表
+-> VideoFeedCacheConsumer：写 Redis feed:latest，删除旧列表/详情缓存
+```
+
+秒杀事务消息链路：
 
 ```text
 Redis Lua 预扣
@@ -241,6 +273,20 @@ Redis Lua 预扣
 -> COMMIT_MESSAGE
 -> Consumer 消费已提交消息
 -> WebSocket SUCCESS
+```
+
+优惠券 WebSocket 消息示例：
+
+```json
+{"type":"COUPON_SECKILL_RESULT","status":"PROCESSING","couponId":1,"couponCode":null,"message":"抢券请求已受理"}
+```
+
+```json
+{"type":"COUPON_SECKILL_RESULT","status":"SUCCESS","couponId":1,"couponCode":"CPN-XXXX-XXXX-XXXX-XXXX","message":"抢券成功"}
+```
+
+```json
+{"type":"COUPON_SECKILL_RESULT","status":"FAILED","couponId":1,"couponCode":null,"message":"抢券失败，请稍后重试"}
 ```
 
 如果 Redis 预扣成功后事务消息发送失败、本地事务回滚或事务回查确认失败，会执行 Redis 补偿；补偿失败会写入 `coupon_seckill_fail`，便于后续人工处理。
@@ -253,8 +299,14 @@ Redis Lua 预扣
 coupon_seckill_pre_deduct
 ```
 
-当前规则从 Nacos 拉取，项目启动时注册 Sentinel Nacos DataSource。代码里不再硬编码调用
+当 `sentinel.nacos.enabled=true` 时，规则从 Nacos 拉取，项目启动时注册 Sentinel Nacos DataSource。代码里不再硬编码调用
 `FlowRuleManager.loadRules`、`ParamFlowRuleManager.loadRules`、`DegradeRuleManager.loadRules`。
+
+单体部署时可以关闭 Sentinel Nacos 动态监听，保留 Sentinel 本地限流能力：
+
+```properties
+sentinel.nacos.enabled=false
+```
 
 新增 Maven 依赖：
 
@@ -401,6 +453,7 @@ POST   /user/register
 POST   /user/login
 POST   /user/logout
 POST   /user/update
+PUT    /user/password
 POST   /user/avatar
 GET    /user/info
 DELETE /user/delete
@@ -408,18 +461,45 @@ DELETE /user/remove
 POST   /user/promote
 ```
 
+说明：
+
+- 所有登录后接口使用 `Authorization: Bearer {{bearerToken}}`
+- `/user/update` 只用于修改展示资料，不允许修改 `username/password`
+- `/user/password` 请求体为 `oldPassword/newPassword/confirmPassword`，后端会校验旧密码
+
 ### 视频
 
 ```text
 GET    /video/get/id
 GET    /video/get/title?title=&page=&pageSize=&sort=time|hot
 GET    /video/list/hot
+GET    /video/list/hot/cursor?pageSize=&cursorHotScore=&cursorCreateTime=&cursorId=
+GET    /video/feed/cursor?sort=time|hot&pageSize=&cursorHotScore=&cursorCreateTime=&cursorId=
+GET    /video/feed/following?pageSize=&cursorCreateTime=&cursorId=
 GET    /video/list/new?page=&pageSize=
 GET    /video/get/category?categoryId=&page=&pageSize=&sort=time|hot
 POST   /video/post
 DELETE /video/delete
 POST   /video/changeLikes
 ```
+
+首页“最新/热门”推荐流使用 `/video/feed/cursor`。第一页只传：
+
+```text
+sort=time&pageSize=20
+```
+
+后续页：
+
+- `sort=time`：传上一页返回的 `nextCreateTime` 和 `nextId`
+- `sort=hot`：传上一页返回的 `nextHotScore`、`nextCreateTime` 和 `nextId`
+- 空字符串游标会按 `null` 处理，不会再触发 `NumberFormatException: empty String`
+
+关注动态页面使用 `/video/feed/following`。第一版直接查 MySQL：
+
+- 首页：只传 `pageSize=20`
+- 后续页：传上一页返回的 `nextCreateTime` 和 `nextId`
+- 当前 `videos.status` 是字符串，SQL 使用 `status='PUBLISHED'`
 
 视频上传使用 `multipart/form-data`，字段包括：
 
@@ -468,7 +548,10 @@ POST /follow/changeFollow
 
 ```text
 GET /feed/following
+GET /video/feed/following
 ```
+
+`/feed/following` 是旧版 Redis 收件箱接口；新关注动态页使用 `/video/feed/following`，直接从 MySQL 查询关注作者的视频，准确性优先。
 
 ### 优惠券
 
@@ -480,6 +563,14 @@ GET  /coupon/order/status?couponId=
 ```
 
 `/coupon/seckill/preDeduct` 是当前唯一抢券入口，使用 Redis Lua 预扣 + RocketMQ 事务消息。
+
+抢券 WebSocket 实时结果仍走优惠券 RocketMQ 链路，不走 Kafka `video_published`：
+
+```text
+COUPON_SECKILL_RESULT
+```
+
+普通用户 `/coupon/list` 当前只返回 `status=1` 的可用优惠券。
 
 该接口已接入 Sentinel：
 
@@ -508,11 +599,26 @@ ws://localhost:8080/video-serve/ws/{userId}?token={{bearerToken}}
 ### 管理
 
 ```text
+GET  /admin/users?page=&pageSize=
+GET  /admin/users/search?nickname=&username=&page=&pageSize=
+POST /user/promote?userId=&role=
+DELETE /user/remove?id=
 POST /admin/coupon/create
+GET  /admin/coupon/list?status=&page=&pageSize=
+DELETE /admin/coupon/delete?couponId=
 POST /admin/video/view-count/flush
 ```
 
-`/admin/coupon/create` 用于内部创建优惠券，需要 `role >= 2`。创建成功后会写入 MySQL，并初始化 Redis 秒杀库存 key。
+管理员接口需要 `role >= 2`。权限细节：
+
+- role=2 可以管理普通用户/会员和优惠券
+- role=2 不允许操作 role=3 用户
+- role=2 不允许把用户提升为 role=2/3
+- role=3 可以把低等级用户设置为 role=2/3
+
+`/admin/coupon/create` 用于内部创建优惠券。创建成功后会写入 MySQL，并初始化 Redis 秒杀库存 key。
+
+`/admin/coupon/delete` 当前实现是逻辑停用优惠券，将 `status` 改为 `0`，并删除秒杀 Redis key。
 
 `/admin/video/view-count/flush` 用于手动触发播放量 Redis 增量刷库，需要管理员角色。
 
@@ -617,6 +723,6 @@ SELECT * FROM coupon_seckill_fail ORDER BY id DESC LIMIT 10;
 
 - 当前项目不是 Spring Boot，不使用 Spring 注解。
 - 运行上传视频 / 头像功能前，需要配置阿里云 OSS 环境变量。
-- 使用 Feed 链路前，需要启动 Kafka，并创建 `video_publish` topic。
+- 使用 Feed 链路前，需要启动 Kafka，并创建 `video_published` topic。
 - 使用秒杀异步链路前，需要启动 RocketMQ，并创建 `coupon_seckill_tx` topic。
 - `openapi.yaml` 是接口调试入口，建议导入 Apifox 使用。由于OpenAPI本质是对 HTTP 规范，对WebSocket 支持是文档级而非执行级，因此需要我们手动在 apifox里面修改接口测试

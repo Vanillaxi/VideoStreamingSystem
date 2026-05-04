@@ -2,9 +2,17 @@
 <mapper namespace="com.video.mapper.NotificationMapper">
 
     <insert id="insert">
-        INSERT INTO notification
+        INSERT IGNORE INTO notification
         (user_id, type, content, related_id, is_read, create_time)
         VALUES (?, ?, ?, ?, ?, ?)
     </insert>
+
+    <select id="exists" resultType="java.lang.Boolean">
+        SELECT COUNT(*)
+        FROM notification
+        WHERE user_id = ?
+          AND type = ?
+          AND related_id = ?
+    </select>
 
 </mapper>

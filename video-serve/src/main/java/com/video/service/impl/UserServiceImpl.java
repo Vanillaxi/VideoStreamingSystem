@@ -7,6 +7,11 @@ import com.video.exception.BusinessException;
 import com.video.exception.ErrorCode;
 import com.video.pojo.entity.User;
 import com.video.mapper.UserMapper;
+import com.video.mapper.FollowMapper;
+import com.video.pojo.dto.PageResult;
+import com.video.pojo.dto.PasswordUpdateRequest;
+import com.video.pojo.dto.UserAdminVO;
+import com.video.pojo.dto.UserInfoVO;
 import com.video.service.UserService;
 import com.video.utils.JWTUtil;
 import com.video.utils.OssClientUtil;
@@ -18,6 +23,8 @@ import jakarta.servlet.http.Part;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @MyComponent
@@ -25,6 +32,9 @@ public class UserServiceImpl implements UserService {
 
     @MyAutowired
     private UserMapper userMapper;
+
+    @MyAutowired
+    private FollowMapper followMapper;
 
     //注册
     @Override
@@ -96,9 +106,30 @@ public class UserServiceImpl implements UserService {
         }
         
         if (user.getNickname()!=null) {userDto.setNickname(user.getNickname());}
-        if (user.getPassword()!=null) {userDto.setPassword(PasswordUtil.hashPassword(user.getPassword()));}
         userDto.setUpdateUser(userDto.getUsername());
-        userMapper.update(userDto);
+        userMapper.updateProfile(userDto);
+    }
+
+    @Override
+    public void updatePassword(PasswordUpdateRequest request) {
+        if (request == null || isBlank(request.getOldPassword()) || isBlank(request.getNewPassword())) {
+            throw new BusinessException(400, "旧密码和新密码不能为空");
+        }
+        if (request.getConfirmPassword() != null && !request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BusinessException(400, "两次输入的新密码不一致");
+        }
+        User currentUser = UserHolder.getUser();
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new AuthException(ErrorCode.USER_NOT_LOGIN);
+        }
+        User dbUser = userMapper.getByUserId(currentUser.getId());
+        if (dbUser == null) {
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
+        }
+        if (!PasswordUtil.checkPassword(request.getOldPassword(), dbUser.getPassword())) {
+            throw new BusinessException(401, "旧密码错误");
+        }
+        userMapper.updatePassword(dbUser.getId(), PasswordUtil.hashPassword(request.getNewPassword()), dbUser.getUsername());
     }
 
     /**
@@ -120,7 +151,7 @@ public class UserServiceImpl implements UserService {
         user.setAvatarUrl(uploadedObject.getUrl());
         user.setAvatarObjectKey(uploadedObject.getObjectKey());
         user.setUpdateUser(user.getUsername());
-        userMapper.update(user);
+        userMapper.updateAvatar(user);
 
         if (oldObjectKey != null && !oldObjectKey.isBlank()) {
             try {
@@ -178,7 +209,7 @@ public class UserServiceImpl implements UserService {
         checkTargetRoleLowerThanAdmin(adminUser, role);
         user.setUpdateUser(adminUser.getUsername());
         user.setRole(role);
-        userMapper.update(user);
+        userMapper.updateRole(user);
         log.info("管理员 {} 将用户 {} 权限调整为 {}", adminUser.getId(), userId, role);
     }
 
@@ -209,8 +240,12 @@ public class UserServiceImpl implements UserService {
         if (targetRole == null || targetRole < 0) {
             throw new BusinessException(400, "目标权限等级不合法");
         }
-        if (targetRole >= safeRole(adminUser.getRole())) {
+        int adminRole = safeRole(adminUser.getRole());
+        if (adminRole < 3 && targetRole >= adminRole) {
             throw new BusinessException(403, "只能将用户提权到低于自己的等级");
+        }
+        if (adminRole >= 3 && targetRole > 3) {
+            throw new BusinessException(403, "目标权限等级不合法");
         }
     }
 
@@ -224,13 +259,99 @@ public class UserServiceImpl implements UserService {
      * @return
      */
     @Override
-    public User getById(Long id) {
+    public UserInfoVO getById(Long id) {
         User user= userMapper.getByUserId(id);
         if(user==null){
             throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
-        user.setPassword(null);
-        return user;
+        return toUserInfoVO(user);
+    }
+
+    private UserInfoVO toUserInfoVO(User user) {
+        UserInfoVO vo = new UserInfoVO();
+        vo.setTargetUserId(user.getId());
+        vo.setNickname(user.getNickname());
+        vo.setAvatarUrl(user.getAvatarUrl());
+        vo.setAvatar(user.getAvatarUrl());
+        vo.setRole(user.getRole());
+        vo.setCreateTime(user.getCreateTime());
+        vo.setFollowCount(safeCount(followMapper.countFollowings(user.getId())));
+        vo.setFanCount(safeCount(followMapper.countFollowers(user.getId())));
+        vo.setMutualFollowCount(safeCount(followMapper.countFriends(user.getId())));
+        User currentUser = UserHolder.getUser();
+        if (currentUser == null || currentUser.getId() == null || currentUser.getId().equals(user.getId())) {
+            vo.setIsFollowed(false);
+        } else {
+            vo.setIsFollowed(Boolean.TRUE.equals(followMapper.isFollow(user.getId(), currentUser.getId())));
+        }
+        return vo;
+    }
+
+    @Override
+    public PageResult<UserAdminVO> listUsersByAdmin(Integer page, Integer pageSize) {
+        checkAdminAccess();
+        int currentPage = normalizePage(page);
+        int currentPageSize = normalizePageSize(pageSize);
+        int offset = (currentPage - 1) * currentPageSize;
+        Long total = userMapper.countUsers();
+        List<User> users = userMapper.listUsers(offset, currentPageSize);
+        return new PageResult<>(total == null ? 0L : total, toAdminVOList(users));
+    }
+
+    @Override
+    public PageResult<UserAdminVO> searchUsersByAdmin(String nickname, String username, Integer page, Integer pageSize) {
+        checkAdminAccess();
+        int currentPage = normalizePage(page);
+        int currentPageSize = normalizePageSize(pageSize);
+        int offset = (currentPage - 1) * currentPageSize;
+        String nicknameLike = isBlank(nickname) ? null : "%" + nickname.trim() + "%";
+        String usernameLike = isBlank(username) ? null : "%" + username.trim() + "%";
+        Long total = userMapper.countSearchUsers(nicknameLike, usernameLike);
+        List<User> users = userMapper.searchUsers(nicknameLike, usernameLike, offset, currentPageSize);
+        return new PageResult<>(total == null ? 0L : total, toAdminVOList(users));
+    }
+
+    private void checkAdminAccess() {
+        User adminUser = getCurrentAdmin();
+        if (safeRole(adminUser.getRole()) < 2) {
+            throw new BusinessException(403, "权限不足，请联系香草管理员");
+        }
+    }
+
+    private List<UserAdminVO> toAdminVOList(List<User> users) {
+        List<UserAdminVO> result = new ArrayList<>();
+        if (users == null) {
+            return result;
+        }
+        for (User user : users) {
+            UserAdminVO vo = new UserAdminVO();
+            vo.setUserId(user.getId());
+            vo.setUsername(user.getUsername());
+            vo.setNickname(user.getNickname());
+            vo.setAvatarUrl(user.getAvatarUrl());
+            vo.setRole(user.getRole());
+            vo.setStatus("正常");
+            vo.setCreateTime(user.getCreateTime());
+            vo.setUpdateTime(user.getUpdateTime());
+            result.add(vo);
+        }
+        return result;
+    }
+
+    private int normalizePage(Integer page) {
+        return page == null || page < 1 ? 1 : page;
+    }
+
+    private int normalizePageSize(Integer pageSize) {
+        return pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private Long safeCount(Long count) {
+        return count == null ? 0L : count;
     }
 
 }

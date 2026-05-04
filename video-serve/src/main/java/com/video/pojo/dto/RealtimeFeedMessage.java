@@ -7,6 +7,9 @@ public class RealtimeFeedMessage {
     private String type;
     private Long videoId;
     private Long authorId;
+    private String title;
+    private String coverUrl;
+    private String createTime;
     private Long createdAt;
     private String content;
 }

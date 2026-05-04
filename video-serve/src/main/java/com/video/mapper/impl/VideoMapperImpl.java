@@ -235,9 +235,12 @@ public class VideoMapperImpl implements VideoMapper {
 
     @Override
     public List<Video> getHotCursorPage(Double cursorHotScore, LocalDateTime cursorCreateTime, Long cursorId, int limit) {
-        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getHotCursorPage");
+        if (cursorHotScore == null && cursorCreateTime == null && cursorId == null) {
+            String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getHotCursorPage");
+            return executeQuery(Video.class, sql, limit);
+        }
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getHotCursorPageAfter");
         return executeQuery(Video.class, sql,
-                cursorHotScore,
                 cursorHotScore,
                 cursorHotScore,
                 cursorCreateTime,
@@ -249,12 +252,28 @@ public class VideoMapperImpl implements VideoMapper {
 
     @Override
     public List<Video> getTimeCursorPage(LocalDateTime cursorCreateTime, Long cursorId, int limit) {
-        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getTimeCursorPage");
+        if (cursorCreateTime == null && cursorId == null) {
+            String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getTimeCursorPage");
+            return executeQuery(Video.class, sql, limit);
+        }
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getTimeCursorPageAfter");
         return executeQuery(Video.class, sql,
                 cursorCreateTime,
                 cursorCreateTime,
                 cursorId,
                 limit);
+    }
+
+    @Override
+    public List<Video> getFollowingFeedTimePage(Long userId, int limit) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getFollowingFeedTimePage");
+        return executeQuery(Video.class, sql, userId, limit);
+    }
+
+    @Override
+    public List<Video> getFollowingFeedTimePageAfter(Long userId, LocalDateTime cursorCreateTime, Long cursorId, int limit) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.VideoMapper.getFollowingFeedTimePageAfter");
+        return executeQuery(Video.class, sql, userId, cursorCreateTime, cursorCreateTime, cursorId, limit);
     }
 
     @Override

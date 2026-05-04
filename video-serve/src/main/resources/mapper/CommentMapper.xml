@@ -47,7 +47,8 @@
         c.hot_score AS hotScore,
         c.deleted,
         u.username AS username,
-        u.nickname AS nickname
+        u.nickname AS nickname,
+        u.avatar_url AS avatarUrl
         FROM comments c
         LEFT JOIN user u ON c.user_id = u.id
         WHERE c.id = ?
@@ -108,8 +109,10 @@
         c.deleted,
         u.username AS username,
         u.nickname AS nickname,
+        u.avatar_url AS avatarUrl,
         ru.username AS replyToUsername,
-        ru.nickname AS replyToNickname
+        ru.nickname AS replyToNickname,
+        ru.avatar_url AS replyToAvatarUrl
         FROM comments c
         LEFT JOIN user u ON c.user_id = u.id
         LEFT JOIN user ru ON c.reply_to_user_id = ru.id
@@ -134,8 +137,10 @@
         c.deleted,
         u.username AS username,
         u.nickname AS nickname,
+        u.avatar_url AS avatarUrl,
         ru.username AS replyToUsername,
-        ru.nickname AS replyToNickname
+        ru.nickname AS replyToNickname,
+        ru.avatar_url AS replyToAvatarUrl
         FROM comments c
         LEFT JOIN user u ON c.user_id = u.id
         LEFT JOIN user ru ON c.reply_to_user_id = ru.id
@@ -161,8 +166,10 @@
         c.deleted,
         u.username AS username,
         u.nickname AS nickname,
+        u.avatar_url AS avatarUrl,
         ru.username AS replyToUsername,
-        ru.nickname AS replyToNickname
+        ru.nickname AS replyToNickname,
+        ru.avatar_url AS replyToAvatarUrl
         FROM comments c
         LEFT JOIN user u ON c.user_id = u.id
         LEFT JOIN user ru ON c.reply_to_user_id = ru.id
@@ -187,8 +194,10 @@
         c.deleted,
         u.username AS username,
         u.nickname AS nickname,
+        u.avatar_url AS avatarUrl,
         ru.username AS replyToUsername,
-        ru.nickname AS replyToNickname
+        ru.nickname AS replyToNickname,
+        ru.avatar_url AS replyToAvatarUrl
         FROM comments c
         LEFT JOIN user u ON c.user_id = u.id
         LEFT JOIN user ru ON c.reply_to_user_id = ru.id
@@ -217,8 +226,10 @@
         c.deleted,
         u.username AS username,
         u.nickname AS nickname,
+        u.avatar_url AS avatarUrl,
         ru.username AS replyToUsername,
-        ru.nickname AS replyToNickname
+        ru.nickname AS replyToNickname,
+        ru.avatar_url AS replyToAvatarUrl
         FROM comments c
         LEFT JOIN user u ON c.user_id = u.id
         LEFT JOIN user ru ON c.reply_to_user_id = ru.id

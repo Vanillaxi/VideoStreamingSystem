@@ -27,6 +27,8 @@ public interface VideoMapper {
     List<Video> getHotTop50();
     List<Video> getHotCursorPage(Double cursorHotScore, LocalDateTime cursorCreateTime, Long cursorId, int limit);
     List<Video> getTimeCursorPage(LocalDateTime cursorCreateTime, Long cursorId, int limit);
+    List<Video> getFollowingFeedTimePage(Long userId, int limit);
+    List<Video> getFollowingFeedTimePageAfter(Long userId, LocalDateTime cursorCreateTime, Long cursorId, int limit);
     List<Video> getNewestPage(int offset, int pageSize);
     Long getVideoCount();
 

@@ -17,4 +17,8 @@ public interface CouponService {
     Long seckillPreDeduct(CouponSeckillRequest request);
 
     CouponOrderStatusDTO orderStatus(Long couponId);
+
+    PageResult<Coupon> listByAdmin(Integer status, Integer page, Integer pageSize);
+
+    void disableByAdmin(Long couponId);
 }

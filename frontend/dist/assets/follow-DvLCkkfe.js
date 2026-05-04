@@ -1,0 +1,1 @@
+import{z as l}from"./index-DlaXbFNA.js";function t(o){return l.get("/follow/followings",{params:o})}function r(o){return l.get("/follow/followers",{params:o})}function s(o){return l.get("/follow/friends",{params:o})}function e(o){return l.post("/follow/changeFollow",null,{params:{followingId:o}})}export{s as a,t as b,e as c,r as l};

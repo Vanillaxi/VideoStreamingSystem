@@ -16,7 +16,7 @@ import java.util.Properties;
 
 @Slf4j
 public class KafkaTestProducer {
-    private static final String DEFAULT_TOPIC = "video_publish";
+    private static final String DEFAULT_TOPIC = "video_published";
     private static final Properties config = loadConfig();
     private static volatile KafkaProducer<String, String> producer;
 
@@ -29,9 +29,14 @@ public class KafkaTestProducer {
         Long createdAt = request == null || request.getCreatedAt() == null ? System.currentTimeMillis() : request.getCreatedAt();
 
         Map<String, Object> event = new LinkedHashMap<>();
-        event.put("type", "VIDEO_PUBLISHED");
+        event.put("eventId", java.util.UUID.randomUUID().toString());
+        event.put("eventType", "video_published");
         event.put("videoId", videoId);
         event.put("authorId", authorId);
+        event.put("title", "Kafka 测试视频");
+        event.put("coverUrl", null);
+        event.put("createTime", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        event.put("eventTime", createdAt);
         event.put("createdAt", createdAt);
 
         String topic = config.getProperty("kafka.video.publish.topic", DEFAULT_TOPIC);

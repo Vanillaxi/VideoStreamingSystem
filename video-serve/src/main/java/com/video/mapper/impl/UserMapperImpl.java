@@ -76,10 +76,38 @@ public class UserMapperImpl implements UserMapper {
     }
 
     @Override
+    public List<User> listUsers(int offset, int pageSize) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.listUsers");
+        return JdbcUtils.executeQuery(User.class, sql, offset, pageSize);
+    }
+
+    @Override
+    public Long countUsers() {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.countUsers");
+        return JdbcUtils.executeQueryCount(sql);
+    }
+
+    @Override
+    public List<User> searchUsers(String nicknameLike, String usernameLike, int offset, int pageSize) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.searchUsers");
+        return JdbcUtils.executeQuery(User.class, sql,
+                nicknameLike, nicknameLike,
+                usernameLike, usernameLike,
+                offset, pageSize);
+    }
+
+    @Override
+    public Long countSearchUsers(String nicknameLike, String usernameLike) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.countSearchUsers");
+        return JdbcUtils.executeQueryCount(sql,
+                nicknameLike, nicknameLike,
+                usernameLike, usernameLike);
+    }
+
+    @Override
     public void update(User user) {
         String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.update");
         executeUpdate(sql,
-                user.getUsername(),
                 user.getPassword(),
                 user.getNickname(),
                 user.getAvatarUrl(),
@@ -87,6 +115,30 @@ public class UserMapperImpl implements UserMapper {
                 user.getRole(),
                 user.getUpdateUser(),
                 user.getId());
+    }
+
+    @Override
+    public void updateProfile(User user) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.updateProfile");
+        executeUpdate(sql, user.getNickname(), user.getUpdateUser(), user.getId());
+    }
+
+    @Override
+    public void updateAvatar(User user) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.updateAvatar");
+        executeUpdate(sql, user.getAvatarUrl(), user.getAvatarObjectKey(), user.getUpdateUser(), user.getId());
+    }
+
+    @Override
+    public void updateRole(User user) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.updateRole");
+        executeUpdate(sql, user.getRole(), user.getUpdateUser(), user.getId());
+    }
+
+    @Override
+    public void updatePassword(Long userId, String password, String updateUser) {
+        String sql = XmlSqlReaderUtil.getSql("com.video.mapper.UserMapper.updatePassword");
+        executeUpdate(sql, password, updateUser, userId);
     }
 
     @Override

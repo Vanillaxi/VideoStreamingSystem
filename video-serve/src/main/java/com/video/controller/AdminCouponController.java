@@ -18,4 +18,17 @@ public class AdminCouponController extends BaseController {
     public Result create(AdminCouponCreateRequest request) {
         return Result.success(couponService.createByAdmin(request));
     }
+
+    @RequireRole(2)
+    @MyMapping(value = "/list", method = "GET")
+    public Result list(Integer status, Integer page, Integer pageSize) {
+        return Result.success(couponService.listByAdmin(status, page, pageSize));
+    }
+
+    @RequireRole(2)
+    @MyMapping(value = "/delete", method = "DELETE")
+    public Result delete(Long couponId) {
+        couponService.disableByAdmin(couponId);
+        return Result.success("优惠券已停用");
+    }
 }

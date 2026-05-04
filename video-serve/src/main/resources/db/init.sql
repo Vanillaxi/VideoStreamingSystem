@@ -176,7 +176,8 @@ CREATE TABLE `notification` (
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_notification_user_read_time` (`user_id`, `is_read`, `create_time`),
-    KEY `idx_notification_related` (`related_id`)
+    KEY `idx_notification_related` (`related_id`),
+    UNIQUE KEY `uk_notification_user_type_related` (`user_id`, `type`, `related_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='站内通知表';
 
 -- ----------------------------

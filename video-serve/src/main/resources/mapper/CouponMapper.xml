@@ -86,4 +86,11 @@
           AND stock > 0
     </update>
 
+    <update id="disable">
+        UPDATE coupon
+        SET status = 0,
+            update_time = NOW()
+        WHERE id = ?
+    </update>
+
 </mapper>

@@ -14,7 +14,7 @@ import java.util.Properties;
 
 @Slf4j
 public class KafkaProducerUtil {
-    private static final String DEFAULT_TOPIC = "video_publish";
+    private static final String DEFAULT_TOPIC = "video_published";
     private static volatile KafkaProducer<String, String> producer;
     private static final Properties config = loadConfig();
 

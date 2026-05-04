@@ -3,6 +3,7 @@ package com.video.controller;
 import com.video.annotation.MyAutowired;
 import com.video.annotation.MyMapping;
 import com.video.pojo.dto.PageResult;
+import com.video.pojo.dto.VideoVO;
 import com.video.pojo.entity.Video;
 import com.video.pojo.dto.Result;
 import com.video.service.VideoService;
@@ -27,7 +28,7 @@ public class VideoController extends BaseController {
      */
     @MyMapping (value="/get/id",method="GET")
     public Result getVideo(Long id){
-        Video video= videoService.getVideoById(id);
+        VideoVO video= videoService.getVideoById(id);
         return Result.success(video);
     }
 
@@ -64,6 +65,11 @@ public class VideoController extends BaseController {
     @MyMapping(value = "/feed/cursor", method = "GET")
     public Result getFeedCursorPage(String sort, Double cursorHotScore, String cursorCreateTime, Long cursorId, Integer pageSize) {
         return Result.success(videoService.getFeedCursorPage(sort, cursorHotScore, cursorCreateTime, cursorId, pageSize));
+    }
+
+    @MyMapping(value = "/feed/following", method = "GET")
+    public Result getFollowingFeedCursorPage(String cursorCreateTime, Long cursorId, Integer pageSize) {
+        return Result.success(videoService.getFollowingFeedCursorPage(cursorCreateTime, cursorId, pageSize));
     }
 
     /**

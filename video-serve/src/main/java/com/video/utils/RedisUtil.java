@@ -270,6 +270,15 @@ public class RedisUtil {
         }
     }
 
+    public static Long zremrangeByRank(String key, long start, long stop) {
+        try (Jedis jedis = getJedis()) {
+            return jedis.zremrangeByRank(key, start, stop);
+        } catch (Exception e) {
+            log.error("Redis zremrangeByRank 操作失败", e);
+            return 0L;
+        }
+    }
+
     /**
      * ZSet 正序分页查询 (从小到大)
      */

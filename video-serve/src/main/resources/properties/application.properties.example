@@ -21,8 +21,10 @@ oss.domain=https://video-streaming-system.oss-cn-hangzhou.aliyuncs.com
 # OSS_ACCESS_KEY_SECRET
 
 kafka.bootstrap.servers=localhost:9092
-kafka.video.publish.topic=video_publish
-kafka.video.publish.group.id=video-feed-push-group
+kafka.video.publish.topic=video_published
+kafka.video.notify.group.id=video-publish-notify-group
+kafka.video.notification.group.id=video-publish-notification-group
+kafka.video.feed-cache.group.id=video-feed-cache-group
 
 rocketmq.namesrvAddr=localhost:9876
 rocketmq.topic.couponSeckillTx=coupon_seckill_tx
@@ -31,6 +33,7 @@ rocketmq.consumerGroup.couponSeckillTx=coupon_seckill_tx_consumer_group
 rocketmq.consumerMaxReconsumeTimes.couponSeckillTx=16
 
 nacos.serverAddr=localhost:8848
+sentinel.nacos.enabled=false
 sentinel.nacos.group=SENTINEL_GROUP
 sentinel.nacos.flowDataId=video-system-flow-rules
 sentinel.nacos.paramFlowDataId=video-system-param-flow-rules

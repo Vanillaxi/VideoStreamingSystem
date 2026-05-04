@@ -8,6 +8,7 @@ import com.video.exception.ErrorCode;
 import com.video.mapper.FollowMapper;
 import com.video.mapper.UserMapper;
 import com.video.pojo.dto.PageResult;
+import com.video.pojo.dto.UserInfoVO;
 import com.video.pojo.entity.User;
 import com.video.pojo.entity.UserFollow;
 import com.video.service.FollowService;
@@ -130,12 +131,6 @@ public class FollowServiceImpl implements FollowService {
         return score != null;
     }
 
-    private void hidePasswords(List<User> userList) {
-        for (User user : userList) {
-            user.setPassword(null);
-        }
-    }
-
     private PageResult getUsersFromZSet(String key, int page, int pageSize) {
         long start = (long) (page - 1) * pageSize;
         long end = start + pageSize - 1;
@@ -147,20 +142,42 @@ public class FollowServiceImpl implements FollowService {
 
         List<Long> userIds = userIdSet.stream().map(Long::valueOf).collect(Collectors.toList());
         List<User> users = userMapper.getByIds(userIds);
-        hidePasswords(users);
         Map<Long, User> userMap = new LinkedHashMap<>();
         for (User user : users) {
             userMap.put(user.getId(), user);
         }
 
-        List<User> orderedUsers = new ArrayList<>();
+        List<UserInfoVO> orderedUsers = new ArrayList<>();
         for (Long userId : userIds) {
             User user = userMap.get(userId);
             if (user != null) {
-                orderedUsers.add(user);
+                orderedUsers.add(toUserInfoVO(user));
             }
         }
         return new PageResult(total == null ? 0L : total, orderedUsers);
+    }
+
+    private UserInfoVO toUserInfoVO(User user) {
+        UserInfoVO vo = new UserInfoVO();
+        vo.setTargetUserId(user.getId());
+        vo.setNickname(user.getNickname());
+        vo.setAvatarUrl(user.getAvatarUrl());
+        vo.setAvatar(user.getAvatarUrl());
+        vo.setCreateTime(user.getCreateTime());
+        vo.setFollowCount(safeCount(followMapper.countFollowings(user.getId())));
+        vo.setFanCount(safeCount(followMapper.countFollowers(user.getId())));
+        vo.setMutualFollowCount(safeCount(followMapper.countFriends(user.getId())));
+        User currentUser = UserHolder.getUser();
+        if (currentUser == null || currentUser.getId() == null || currentUser.getId().equals(user.getId())) {
+            vo.setIsFollowed(false);
+        } else {
+            vo.setIsFollowed(Boolean.TRUE.equals(followMapper.isFollow(user.getId(), currentUser.getId())));
+        }
+        return vo;
+    }
+
+    private Long safeCount(Long count) {
+        return count == null ? 0L : count;
     }
 
     //重建缓存
